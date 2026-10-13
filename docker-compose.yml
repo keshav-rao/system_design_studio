@@ -41,12 +41,23 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-system_design_studio}
       QDRANT_URL: http://qdrant:6333
-      ALLOWED_ORIGINS: '["http://localhost:5173", "http://127.0.0.1:5173"]'
+      ALLOWED_ORIGINS: '["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000", "http://localhost"]'
     depends_on:
       postgres:
         condition: service_healthy
       qdrant:
         condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: system_design_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

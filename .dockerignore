@@ -1,0 +1,30 @@
+# Version Control & IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Python
+.venv
+venv
+ENV
+env
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# Node / Frontend
+**/node_modules
+**/dist
+**/.dist
+*.tsbuildinfo
+
+# Storage
+postgres_data
+qdrant_storage
+.env

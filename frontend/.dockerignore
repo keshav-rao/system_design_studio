@@ -1,0 +1,10 @@
+node_modules
+dist
+.dist
+*.local
+*.tsbuildinfo
+.git
+.vscode
+.idea
+Dockerfile
+.dockerignore
