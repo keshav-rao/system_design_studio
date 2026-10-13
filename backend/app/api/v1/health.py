@@ -1,8 +1,9 @@
-from typing import Any, Dict
+from typing import Any
+
+import httpx
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-import httpx
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/health", tags=["health"])
 
 
 @router.get("", status_code=status.HTTP_200_OK)
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     return {
         "status": "ok",
         "app": settings.APP_NAME,
@@ -23,18 +24,18 @@ async def health_check() -> Dict[str, Any]:
 @router.get("/ready", status_code=status.HTTP_200_OK)
 async def readiness_check(
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
-    checks: Dict[str, str] = {
+) -> dict[str, Any]:
+    checks: dict[str, str] = {
         "database": "unknown",
         "qdrant": "unknown",
     }
-    
+
     # Check Database
     try:
         await db.execute(text("SELECT 1"))
         checks["database"] = "healthy"
     except Exception as exc:
-        checks["database"] = f"unhealthy: {str(exc)}"
+        checks["database"] = f"unhealthy: {exc!s}"
 
     # Check Qdrant
     try:
@@ -45,7 +46,7 @@ async def readiness_check(
             else:
                 checks["qdrant"] = f"unexpected_status: {res.status_code}"
     except Exception as exc:
-        checks["qdrant"] = f"unreachable: {str(exc)}"
+        checks["qdrant"] = f"unreachable: {exc!s}"
 
     overall_healthy = all(v == "healthy" for v in checks.values())
     return {

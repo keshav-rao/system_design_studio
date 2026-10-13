@@ -1,0 +1,62 @@
+[
+  {
+    "id": "eval-01",
+    "question": "How do you detect a mutual match when two users swipe right on each other in a dating app like Tinder?",
+    "gold_topics": ["tinder", "mutual match", "swipe", "redis"],
+    "expected_collection": "case_studies"
+  },
+  {
+    "id": "eval-02",
+    "question": "How does consistent hashing prevent cache stampedes when adding or removing cache nodes?",
+    "gold_topics": ["consistent hashing", "virtual nodes", "hash ring", "cache stampede"],
+    "expected_collection": "foundations"
+  },
+  {
+    "id": "eval-03",
+    "question": "What are the trade-offs between consistency and latency when network partitions do not occur under the PACELC theorem?",
+    "gold_topics": ["pacelc", "latency", "consistency", "partition"],
+    "expected_collection": "foundations"
+  },
+  {
+    "id": "eval-04",
+    "question": "How do you scale real-time WebSocket connections across multiple server nodes for chat messaging?",
+    "gold_topics": ["websocket", "redis pub/sub", "backplane", "socket"],
+    "expected_collection": "cloud_docs"
+  },
+  {
+    "id": "eval-05",
+    "question": "What caching strategy should be used to avoid stale data race conditions during database writes?",
+    "gold_topics": ["cache-aside", "delete", "write-through", "invalidation"],
+    "expected_collection": "patterns"
+  },
+  {
+    "id": "eval-06",
+    "question": "How does Uber use the H3 hexagonal hierarchical spatial index for dispatch and driver matching?",
+    "gold_topics": ["uber", "h3", "hexagonal", "geospatial", "dispatch"],
+    "expected_collection": "case_studies"
+  },
+  {
+    "id": "eval-07",
+    "question": "How do you calculate database connection pool size using Little's Law to prevent connection exhaustion?",
+    "gold_topics": ["little's law", "connection pool", "concurrency", "pgbouncer"],
+    "expected_collection": "capacity"
+  },
+  {
+    "id": "eval-08",
+    "question": "How does Netflix Open Connect deliver 95% of video traffic from local ISP data centers?",
+    "gold_topics": ["netflix", "open connect", "caching", "oca", "isp"],
+    "expected_collection": "case_studies"
+  },
+  {
+    "id": "eval-09",
+    "question": "How does a distributed rate limiter avoid race conditions across API gateway nodes?",
+    "gold_topics": ["rate limiting", "token bucket", "sliding window", "redis", "lua"],
+    "expected_collection": "patterns"
+  },
+  {
+    "id": "eval-10",
+    "question": "How does object storage scale throughput using prefix partitioning for millions of requests per second?",
+    "gold_topics": ["object storage", "prefix", "throughput", "s3", "partition"],
+    "expected_collection": "cloud_docs"
+  }
+]

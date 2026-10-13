@@ -1,9 +1,9 @@
 # Active Context
 
-Current phase: Phase 0 — Foundation (Completed)
-Current task: Phase 0 verification complete
-Last completed: Implemented backend skeleton, health endpoints, docker-compose, Alembic, frontend Vite workspace, docs, and root rules/memory bank
-In progress: Ready for Phase 1 (Knowledge Base)
-Next up: Phase 1 — Knowledge base ingestion & hybrid search (Markdown/PDF parsing, bge-m3 embeddings in Qdrant)
+Current phase: Phase 1 — Knowledge Base (Completed)
+Current task: Phase 1 verification complete
+Last completed: Implemented heading-aware chunking, hybrid vector store (Qdrant with dense + sparse BM25 vectors), configurable embedder & reranker, PostgreSQL sources schema via Alembic, 25 permitted seed reference documents across 5 collections, REST endpoints (/ingest, /upload, /search, /sources, /seed, /eval), and verified 10-question retrieval benchmark (0.92 MRR, 100% Recall@5).
+In progress: Ready for Phase 2 (Structured Component Catalog)
+Next up: Phase 2 — Structured component catalog (30–50 components, compatibility edges, limits, failure modes, cost units, catalog API)
 Open questions: None
 Blockers: None

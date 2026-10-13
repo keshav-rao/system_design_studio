@@ -1,10 +1,9 @@
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -43,6 +42,7 @@ if isinstance(origins, list):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
 
 # Direct root health endpoint
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["health"])
