@@ -1,0 +1,8 @@
+{
+  "docset": "redis-insight",
+  "format": "md",
+  "pages": 8,
+  "published_at": "https://redis.io/docs/latest/operate/redisinsight/",
+  "title": "Redis Insight",
+  "version": "latest"
+}

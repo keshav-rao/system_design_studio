@@ -1,0 +1,26 @@
+# Suffix object
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Suffix object",
+  "description": "An object that represents a DNS suffix",
+  "categories": ["docs","operate","rs"],
+  "tableOfContents": {"sections":[]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+An API object that represents a DNS suffix in the cluster.
+
+| Name | Type/Value | Description |
+|------|------------|-------------|
+| default | boolean | Suffix is the default suffix for the cluster (read-only) |
+| internal | boolean | Does the suffix point to internal IP addresses (read-only) |
+| mdns | boolean | Support for multicast DNS (read-only) |
+| name | string | Unique suffix name that represents its zone (read-only) |
+| slaves | array of strings | Frontend DNS servers to be updated by this suffix |
+| use_aaaa_ns | boolean | Suffix uses AAAA NS entries (read-only) |

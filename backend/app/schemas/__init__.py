@@ -1,3 +1,17 @@
+from app.schemas.catalog import (
+    CompatibilityCheckRequest,
+    CompatibilityCheckResponse,
+    CompatibilityEdgeBase,
+    CompatibilityEdgeCreate,
+    CompatibilityEdgeResponse,
+    ComponentBase,
+    ComponentCreate,
+    ComponentListResponse,
+    ComponentResponse,
+    ComponentUpdate,
+    CostUnit,
+    FailureMode,
+)
 from app.schemas.knowledge import (
     CollectionType,
     EvalQuestionSchema,
@@ -14,8 +28,20 @@ from app.schemas.knowledge import (
 
 __all__ = [
     "CollectionType",
+    "CompatibilityCheckRequest",
+    "CompatibilityCheckResponse",
+    "CompatibilityEdgeBase",
+    "CompatibilityEdgeCreate",
+    "CompatibilityEdgeResponse",
+    "ComponentBase",
+    "ComponentCreate",
+    "ComponentListResponse",
+    "ComponentResponse",
+    "ComponentUpdate",
+    "CostUnit",
     "EvalQuestionSchema",
     "EvalRunResult",
+    "FailureMode",
     "KnowledgeChunk",
     "KnowledgeFilter",
     "KnowledgeIngestRequest",

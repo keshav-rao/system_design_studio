@@ -1,0 +1,8 @@
+{
+  "docset": "redis-kubernetes",
+  "format": "md",
+  "pages": 220,
+  "published_at": "https://redis.io/docs/latest/operate/kubernetes/",
+  "title": "Redis for Kubernetes",
+  "version": "latest"
+}

@@ -1,9 +1,9 @@
 # Active Context
 
-Current phase: Phase 1 — Knowledge Base (Completed)
-Current task: Phase 1 verification complete
-Last completed: Implemented heading-aware chunking, hybrid vector store (Qdrant with dense + sparse BM25 vectors), configurable embedder & reranker, PostgreSQL sources schema via Alembic, 25 permitted seed reference documents across 5 collections, REST endpoints (/ingest, /upload, /search, /sources, /seed, /eval), and verified 10-question retrieval benchmark (0.92 MRR, 100% Recall@5).
-In progress: Ready for Phase 2 (Structured Component Catalog)
-Next up: Phase 2 — Structured component catalog (30–50 components, compatibility edges, limits, failure modes, cost units, catalog API)
+Current phase: Phase 2 — Structured Component Catalog (Completed)
+Current task: Phase 2 verification complete
+Last completed: Curated and created comprehensive raw materials knowledge base in `/rag_knowledge_base` with 28 structured documents across 7 categories (01_fundamentals, 02_cloud_frameworks, 03_component_decision_guides, 04_reference_architectures, 05_performance_and_load_testing, 06_cost_and_capacity_models, 07_architecture_decision_records), complete with chunk metadata headers, machine-readable `corpus_manifest.json`, and explicit answers to core architectural decisions (Tinder with Redis, Kafka vs RabbitMQ, SQL vs NoSQL, L4 vs L7, benchmark k6/Locust, cost models).
+In progress: Ready for Phase 3 (Deterministic Validator) or RAG corpus ingestion
+Next up: Phase 3 — Validator (Pure rule functions per file, passing and failing tests for each rule, project validation endpoint)
 Open questions: None
 Blockers: None

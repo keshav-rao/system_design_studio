@@ -1,0 +1,79 @@
+# ZREM
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "ZREM",
+  "description": "Removes one or more members from a sorted set. Deletes the sorted set if all members were removed.",
+  "categories": ["docs","develop","stack","oss","rs","rc","oss","kubernetes","clients"],
+  "arguments": [{"display_text":"key","key_spec_index":0,"name":"key","type":"key"},{"display_text":"member","multiple":true,"name":"member","type":"string"}],
+  "syntax_fmt": "ZREM key member [member ...]",
+  "complexity": "O(M*log(N)) with N being the number of elements in the sorted set and M the number of elements to be removed.",
+  "group": "sorted-set",
+  "command_flags": ["write","fast"],
+  "acl_categories": ["@write","@sortedset","@fast"],
+  "since": "1.2.0",
+  "arity": -3,
+  "key_specs": [{"RW":true,"begin_search":{"spec":{"index":1},"type":"index"},"delete":true,"find_keys":{"spec":{"keystep":1,"lastkey":0,"limit":0},"type":"range"}}],
+  "tableOfContents": {"sections":[{"id":"required-arguments","title":"Required arguments"},{"id":"examples","title":"Examples"},{"id":"redis-software-and-redis-cloud-compatibility","title":"Redis Software and Redis Cloud compatibility"},{"id":"return-information","title":"Return information"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+Removes the specified members from the sorted set stored at `key`.
+Non existing members are ignored.
+
+An error is returned when `key` exists and does not hold a sorted set.
+
+## Required arguments
+
+<details open><summary><code>key</code></summary>
+
+The name of the key that holds the sorted set.
+
+</details>
+
+<details open><summary><code>member [member ...]</code></summary>
+
+One or more members to remove from the sorted set.
+
+</details>
+
+## Examples
+
+
+redis> ZADD myzset 1 "one"
+(integer) 1
+redis> ZADD myzset 2 "two"
+(integer) 1
+redis> ZADD myzset 3 "three"
+(integer) 1
+redis> ZREM myzset "two"
+(integer) 1
+redis> ZRANGE myzset 0 -1 WITHSCORES
+1) "one"
+2) "1"
+3) "three"
+4) "3"
+
+
+## Redis Software and Redis Cloud compatibility
+
+| Redis<br />Software | Redis<br />Cloud | <span style="min-width: 9em; display: table-cell">Notes</span> |
+|:----------------------|:-----------------|:------|
+| <span title="Supported">&#x2705; Standard</span><br /><span title="Supported"><nobr>&#x2705; Active-Active</nobr></span> | <span title="Supported">&#x2705; Standard</span><br /><span title="Supported"><nobr>&#x2705; Active-Active</nobr></span> |  |
+
+## Return information
+
+**RESP2:**
+
+[Integer reply](../../develop/reference/protocol-spec#integers): the number of members removed from the sorted set, not including non-existing members.
+
+**RESP3:**
+
+[Integer reply](../../develop/reference/protocol-spec#integers): the number of members removed from the sorted set, not including non-existing members.
+
+
+

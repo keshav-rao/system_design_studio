@@ -1,0 +1,46 @@
+# Execute
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Execute",
+  "description": "Runs a Redis command. A more flexible version of executeArray.",
+  "categories": ["docs","operate","stack"],
+  "tableOfContents": {"sections":[{"id":"parameters","title":"Parameters"},{"id":"returns","title":"Returns"},{"id":"examples","title":"Examples"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+```java
+public static java.lang.Object execute​(java.lang.String... command)
+```
+
+Runs a Redis command, similar to [`executeArray`](https://redis.io/docs/latest/operate/oss_and_stack/stack-with-enterprise/deprecated-features/gears-v1/jvm/classes/gearsbuilder/executearray). However, the `execute` function is more flexible. Unlike `executeArray`, the list of string arguments does not have to be an explicit `String[]` object. It allows function calls like this: <nobr>`execute("SET", "key", "value")`.</nobr>
+
+## Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| command | string | A Redis command |
+
+## Returns
+
+Returns the command result. It could be a string or an array of strings, depending on the command.
+
+## Examples
+
+Without `String[]`:
+
+```java
+GearsBuilder.execute("SET", "age:maximum", "100");
+```
+
+With `String[]`:
+
+```java
+GearsBuilder.execute(new String[]{"SET", "age:maximum", "100"});
+```
+

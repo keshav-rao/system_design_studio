@@ -1,0 +1,29 @@
+# Alert object
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Alert object",
+  "description": "An object that contains alert info",
+  "categories": ["docs","operate","rs"],
+  "tableOfContents": {"sections":[]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+You can view, configure, and enable various alerts for the cluster.
+
+Alerts are bound to a cluster object (such as a [BDB](https://redis.io/docs/latest/operate/rs/references/rest-api/objects/bdb) or [node](https://redis.io/docs/latest/operate/rs/references/rest-api/objects/node)), and the cluster's state determines whether the alerts turn on or off.
+
+  Name  | Type/Value | Description | Writable
+|-------|------------|-------------|----------|
+| change_time | string | Timestamp when alert state last changed | |
+| change_value | object | Contains data relevant to the evaluation time when the alert went on/off (thresholds, sampled values, etc.) | |
+| enabled | boolean | If true, alert is enabled | x |
+| severity | 'DEBUG'<br />'INFO'<br />'WARNING'<br />'ERROR'<br />'CRITICAL' | The alert's severity | |
+| state | boolean | If true, alert is currently triggered | |
+| threshold | string | Represents an alert threshold when applicable | x |
+

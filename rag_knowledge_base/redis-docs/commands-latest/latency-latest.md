@@ -1,0 +1,69 @@
+# LATENCY LATEST
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "LATENCY LATEST",
+  "description": "Returns the latest latency samples for all events.",
+  "categories": ["docs","develop","stack","oss","rs","rc","oss","kubernetes","clients"],
+  "syntax_fmt": "LATENCY LATEST",
+  "complexity": "O(1)",
+  "group": "server",
+  "command_flags": ["admin","noscript","loading","stale"],
+  "acl_categories": ["@admin","@slow","@dangerous"],
+  "since": "2.8.13",
+  "arity": 2,
+  "tableOfContents": {"sections":[{"id":"examples","title":"Examples"},{"id":"redis-software-and-redis-cloud-compatibility","title":"Redis Software and Redis Cloud compatibility"},{"id":"return-information","title":"Return information"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+The `LATENCY LATEST` command reports the latest latency events logged.
+
+Each reported event has the following fields:
+
+* Event name.
+* Unix timestamp of the latest latency spike for the event.
+* Latest event latency in millisecond.
+* All-time maximum latency for this event.
+
+"All-time" means the maximum latency since the Redis instance was
+started, or the time that events were reset [`LATENCY RESET`](https://redis.io/docs/latest/commands/latency-reset).
+
+## Examples
+
+```
+127.0.0.1:6379> debug sleep 1
+OK
+(1.00s)
+127.0.0.1:6379> debug sleep .25
+OK
+127.0.0.1:6379> latency latest
+1) 1) "command"
+   2) (integer) 1405067976
+   3) (integer) 251
+   4) (integer) 1001
+```
+
+For more information refer to the [Latency Monitoring Framework page](https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency-monitor).
+
+## Redis Software and Redis Cloud compatibility
+
+| Redis<br />Software | Redis<br />Cloud | <span style="min-width: 9em; display: table-cell">Notes</span> |
+|:----------------------|:-----------------|:------|
+| <span title="Not supported">&#x274c; Standard</span><br /><span title="Not supported"><nobr>&#x274c; Active-Active</nobr></span> | <span title="Not supported">&#x274c; Standard</span><br /><span title="Not supported"><nobr>&#x274c; Active-Active</nobr></span> |  |
+
+## Return information
+
+**RESP2:**
+
+[Array reply](../../develop/reference/protocol-spec#arrays): an array where each element is a four elements array representing the event's name, timestamp, latest and all-time latency measurements.
+
+**RESP3:**
+
+[Array reply](../../develop/reference/protocol-spec#arrays): an array where each element is a four elements array representing the event's name, timestamp, latest and all-time latency measurements.
+
+
+

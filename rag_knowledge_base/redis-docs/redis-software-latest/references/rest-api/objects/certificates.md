@@ -1,0 +1,24 @@
+# Certificates object
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Certificates object",
+  "description": "An object that represents a certificate",
+  "categories": ["docs","operate","rs"],
+  "tableOfContents": {"sections":[]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+An API object that represents a certificate used by a Redis Software cluster.
+
+| Name | Type/Value | Description |
+|------|------------|-------------|
+| name | "cm"<br />"api"<br />"mtls_trusted_ca"<br />"proxy"<br />"metrics_exporter"<br />"syncer"<br />"ldap_client"<br />"ccs_internode_encryption"<br />"data_internode_encryption"<br />"sso_service"<br />"sso_issuer" | Certificate type.<br />See the [certificates table](https://redis.io/docs/latest/operate/rs/security/certificates) for the list of cluster certificates and their descriptions. |
+| certificate | string | The certificate in PEM format |
+| key | string | The private key in PEM format |
+

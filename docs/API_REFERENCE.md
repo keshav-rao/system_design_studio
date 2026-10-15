@@ -71,10 +71,57 @@
 - `POST /api/v1/knowledge/eval`
   - Runs retrieval quality benchmark against 10 hand-written system design evaluation questions. Computes MRR, Recall@3, and Recall@5.
 
-### Planned Endpoints (Phases 2-6)
+### Structured Component Catalog (Phase 2)
+- `GET /api/v1/catalog/components`
+  - Lists architectural components with optional filters: `category`, `layer`, `search`, `limit`, `offset`.
+  - Response:
+    ```json
+    {
+      "total": 41,
+      "items": [
+        {
+          "id": "...",
+          "slug": "postgresql",
+          "name": "PostgreSQL Relational Database",
+          "category": "database",
+          "layer": "data",
+          "description": "Advanced ACID-compliant object-relational SQL database...",
+          "protocols": ["TCP", "SQL"],
+          "limits": {
+            "max_throughput_qps": 20000,
+            "connection_limit": 500,
+            "latency_p99_ms": 15
+          },
+          "failure_modes": [...],
+          "cost_units": {
+            "model": "provisioned",
+            "base_monthly_usd": 30.0
+          },
+          "alternatives": ["mysql", "cockroachdb"]
+        }
+      ]
+    }
+    ```
+- `GET /api/v1/catalog/components/{slug_or_id}`
+  - Retrieves detailed component specifications, limits, failure modes, cost units, and alternatives by slug or UUID.
+- `POST /api/v1/catalog/components`
+  - Registers a new architectural building block into the catalog.
+- `PUT /api/v1/catalog/components/{id}`
+  - Updates an existing component's specs, limits, or metadata.
+- `DELETE /api/v1/catalog/components/{id}`
+  - Removes a component from the catalog.
+- `GET /api/v1/catalog/compatibility/check`
+  - Determines whether Component A can interface with Component B, identifying communication protocols, recommended architectural patterns (e.g., PgBouncer pooling, cache-aside), bottleneck throughput limits, and antipattern warnings.
+  - Query parameters: `source`, `target` (e.g. `?source=fastapi-app-server&target=postgresql`).
+- `POST /api/v1/catalog/compatibility`
+  - Defines or updates a compatibility edge between two components.
+- `POST /api/v1/catalog/seed`
+  - Seeds or resets 40+ standard architectural components and 30+ compatibility rules idempotently.
+
+### Planned Endpoints (Phases 3-6)
 - `POST /projects`: Create a new architecture project.
 - `POST /projects/{id}/interview`: Interactive requirement questioning.
 - `POST /projects/{id}/plan`: Generate proposal with planner.
 - `POST /projects/{id}/validate`: Run deterministic validation rules.
 - `PATCH /projects/{id}/design`: Update nodes/edges from canvas edits.
-- `GET /catalog/components`: Retrieve component catalog with alternatives & limits.
+

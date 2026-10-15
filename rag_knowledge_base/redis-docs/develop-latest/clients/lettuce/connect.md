@@ -1,0 +1,438 @@
+# Connect to the server
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Connect to the server",
+  "description": "Connect your Java application to a Redis database",
+  "categories": ["docs","develop","stack","oss","rs","rc","oss","kubernetes","clients"],
+  "tableOfContents": {"sections":[{"id":"basic-connection","title":"Basic connection"},{"id":"connect-to-a-redis-cluster","title":"Connect to a Redis cluster"},{"id":"connect-to-redis-sentinel","title":"Connect to Redis Sentinel"},{"id":"asynchronous-connection","title":"Asynchronous connection"},{"id":"reactive-connection","title":"Reactive connection"},{"children":[{"id":"tls-connection","title":"TLS connection"}],"id":"connect-to-a-redis-cluster-1","title":"Connect to a Redis cluster"},{"id":"connection-management-in-lettuce","title":"Connection Management in Lettuce"},{"id":"connection-pooling","title":"Connection pooling"},{"id":"connect-using-smart-client-handoffs-sch","title":"Connect using Smart client handoffs (SCH)"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+Start by creating a connection to your Redis server. There are many ways to achieve this using Lettuce. Here are a few.
+
+## Basic connection
+
+```java
+import io.lettuce.core.*;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisCommands;
+
+public class ConnectBasicTest {
+
+    public void connectBasic() {
+        RedisURI uri = RedisURI.Builder
+                .redis("localhost", 6379)
+                .withAuthentication("default", "yourPassword")
+                .build();
+        RedisClient client = RedisClient.create(uri);
+        StatefulRedisConnection<String, String> connection = client.connect();
+        RedisCommands<String, String> commands = connection.sync();
+
+        commands.set("foo", "bar");
+        String result = commands.get("foo");
+        System.out.println(result); // >>> bar
+
+        connection.close();
+
+        client.shutdown();
+    }
+}
+```
+
+> [!NOTE]
+> Lettuce supports [connection URLs](https://redis.io/docs/latest/develop/clients/connection-urls#lettuce-java) through `RedisClient.create()`.
+> A URL can set the host, port, credentials, database, and whether to use TLS,
+> so you can use one instead of passing those options separately.
+
+## Connect to a Redis cluster
+
+To connect to a Redis cluster, use `RedisClusterClient`. 
+
+```java
+import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
+
+//...
+try (RedisClusterClient clusterClient = RedisClusterClient.create(redisURI)) {    
+    StatefulRedisClusterConnection<String, String> connection = clusterClient.connect();
+        
+    //...
+    
+    connection.close();    
+}
+```
+
+Learn more about Cluster connections and how to configure them in [the reference guide](https://redis.github.io/lettuce/ha-sharding/#redis-cluster).
+
+## Connect to Redis Sentinel
+
+To connect through [Redis Sentinel](https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel),
+build a `RedisURI` with `RedisURI.Builder.sentinel()`, passing the address of one Sentinel
+and the name of the primary that the Sentinels monitor. Add the other Sentinels with
+`withSentinel()`. The client asks the Sentinels for the current primary.
+
+```java
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisCommands;
+
+//...
+
+RedisURI redisUri = RedisURI.Builder
+        .sentinel("localhost", 26379, "mymaster")
+        .withSentinel("localhost", 26380)
+        .withSentinel("localhost", 26381)
+        .build();
+
+try (RedisClient client = RedisClient.create(redisUri)) {
+    StatefulRedisConnection<String, String> connection = client.connect();
+    RedisCommands<String, String> commands = connection.sync();
+
+    commands.set("foo", "bar");
+    System.out.println(commands.get("foo")); // >>> bar
+
+    connection.close();
+}
+```
+
+The Sentinels and the data nodes have separate credentials. Pass the Sentinel password with
+each Sentinel address, and set the credentials for the primary and replicas with
+`withAuthentication()`:
+
+```java
+RedisURI redisUri = RedisURI.Builder
+        // The password argument authenticates to each Sentinel.
+        .sentinel("localhost", 26379, "mymaster", "yourSentinelPassword")
+        .withSentinel("localhost", 26380, "yourSentinelPassword")
+        .withSentinel("localhost", 26381, "yourSentinelPassword")
+        // withAuthentication() authenticates to the primary and replicas.
+        .withAuthentication("default", "yourPassword")
+        .build();
+```
+
+A `RedisClient` connection doesn't listen for failover announcements from the Sentinels.
+After a failover, it keeps using the old primary until Sentinel reconfigures it as a
+replica and closes the connection. Any writes that the old primary accepts during that time
+are lost.
+
+To read from replicas, open a connection with `MasterReplica.connect()` and set a
+`ReadFrom` policy. This connection also listens for failover announcements from the
+Sentinels, so it switches to a new primary sooner. Replication is asynchronous, so a
+replica can return stale data.
+
+```java
+import io.lettuce.core.ReadFrom;
+import io.lettuce.core.codec.StringCodec;
+import io.lettuce.core.masterreplica.MasterReplica;
+import io.lettuce.core.masterreplica.StatefulRedisMasterReplicaConnection;
+
+//...
+
+try (RedisClient client = RedisClient.create()) {
+    StatefulRedisMasterReplicaConnection<String, String> connection =
+            MasterReplica.connect(client, StringCodec.UTF8, redisUri);
+    connection.setReadFrom(ReadFrom.REPLICA);
+
+    System.out.println(connection.sync().get("foo")); // >>> bar
+
+    connection.close();
+}
+```
+
+## Asynchronous connection
+
+```java
+package org.example;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+
+import io.lettuce.core.*;
+import io.lettuce.core.api.async.RedisAsyncCommands;
+import io.lettuce.core.api.StatefulRedisConnection;
+
+public class Async {
+  public static void main(String[] args) {
+    RedisClient redisClient = RedisClient.create("redis://localhost:6379");
+
+    try (StatefulRedisConnection<String, String> connection = redisClient.connect()) {
+      RedisAsyncCommands<String, String> asyncCommands = connection.async();
+
+      // Asynchronously store & retrieve a simple string
+      asyncCommands.set("foo", "bar").get();
+      System.out.println(asyncCommands.get("foo").get()); // prints bar
+
+      // Asynchronously store key-value pairs in a hash directly
+      Map<String, String> hash = new HashMap<>();
+      hash.put("name", "John");
+      hash.put("surname", "Smith");
+      hash.put("company", "Redis");
+      hash.put("age", "29");
+      asyncCommands.hset("user-session:123", hash).get();
+
+      System.out.println(asyncCommands.hgetall("user-session:123").get());
+      // Prints: {name=John, surname=Smith, company=Redis, age=29}
+    } catch (ExecutionException | InterruptedException e) {
+      throw new RuntimeException(e);
+    } finally {
+      redisClient.shutdown();
+    }
+  }
+}
+```
+
+Learn more about asynchronous Lettuce API in [the reference guide](https://redis.github.io/lettuce/#asynchronous-api).
+
+## Reactive connection
+
+```java
+package org.example;
+import java.util.*;
+import io.lettuce.core.*;
+import io.lettuce.core.api.reactive.RedisReactiveCommands;
+import io.lettuce.core.api.StatefulRedisConnection;
+
+public class Main {
+  public static void main(String[] args) {
+    RedisClient redisClient = RedisClient.create("redis://localhost:6379");
+
+    try (StatefulRedisConnection<String, String> connection = redisClient.connect()) {
+      RedisReactiveCommands<String, String> reactiveCommands = connection.reactive();
+
+      // Reactively store & retrieve a simple string
+      reactiveCommands.set("foo", "bar").block();
+      reactiveCommands.get("foo").doOnNext(System.out::println).block(); // prints bar
+
+      // Reactively store key-value pairs in a hash directly
+      Map<String, String> hash = new HashMap<>();
+      hash.put("name", "John");
+      hash.put("surname", "Smith");
+      hash.put("company", "Redis");
+      hash.put("age", "29");
+
+      reactiveCommands.hset("user-session:124", hash).then(
+              reactiveCommands.hgetall("user-session:124")
+                  .collectMap(KeyValue::getKey, KeyValue::getValue).doOnNext(System.out::println))
+          .block();
+      // Prints: {surname=Smith, name=John, company=Redis, age=29}
+
+    } finally {
+      redisClient.shutdown();
+    }
+  }
+}
+```
+
+Learn more about reactive Lettuce API in [the reference guide](https://redis.github.io/lettuce/#reactive-api).
+
+## Connect to a Redis cluster
+
+```java
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
+import io.lettuce.core.cluster.api.async.RedisAdvancedClusterAsyncCommands;
+
+// ...
+
+RedisURI redisUri = RedisURI.Builder.redis("localhost").withPassword("authentication").build();
+
+RedisClusterClient clusterClient = RedisClusterClient.create(redisUri);
+StatefulRedisClusterConnection<String, String> connection = clusterClient.connect();
+RedisAdvancedClusterAsyncCommands<String, String> commands = connection.async();
+
+// ...
+
+connection.close();
+clusterClient.shutdown();
+```
+
+### TLS connection
+
+When you deploy your application, use TLS and follow the [Redis security guidelines](https://redis.io/docs/latest/operate/oss_and_stack/management/security).
+
+```java
+RedisURI redisUri = RedisURI.Builder.redis("localhost")
+                                 .withSsl(true)
+                                 .withPassword("secret!") // use your Redis password
+                                 .build();
+
+RedisClient client = RedisClient.create(redisUri);
+```
+
+## Connection Management in Lettuce
+
+Lettuce uses `ClientResources` for efficient management of shared resources like event loop groups and thread pools.
+For connection pooling, Lettuce leverages `RedisClient` or `RedisClusterClient`, which can handle multiple concurrent connections efficiently.
+
+## Connection pooling
+
+A typical approach with Lettuce is to create a single `RedisClient` instance and reuse it to establish connections to your Redis server(s).
+These connections are multiplexed; that is, multiple commands can be run concurrently over a single or a small set of connections, making explicit pooling less practical.
+See
+[Connection pools and multiplexing](https://redis.io/docs/latest/develop/clients/pools-and-muxing)
+for more information.
+
+Lettuce provides pool config to be used with Lettuce asynchronous connection methods.
+
+```java
+package org.example;
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.TransactionResult;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.async.RedisAsyncCommands;
+import io.lettuce.core.codec.StringCodec;
+import io.lettuce.core.support.*;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+
+public class Pool {
+  public static void main(String[] args) {
+    RedisClient client = RedisClient.create();
+
+    String host = "localhost";
+    int port = 6379;
+
+    CompletionStage<BoundedAsyncPool<StatefulRedisConnection<String, String>>> poolFuture
+        = AsyncConnectionPoolSupport.createBoundedObjectPoolAsync(
+            () -> client.connectAsync(StringCodec.UTF8, RedisURI.create(host, port)),
+            BoundedPoolConfig.create());
+
+    // await poolFuture initialization to avoid NoSuchElementException: Pool exhausted when starting your application
+    AsyncPool<StatefulRedisConnection<String, String>> pool = poolFuture.toCompletableFuture()
+        .join();
+
+    // execute work
+    CompletableFuture<TransactionResult> transactionResult = pool.acquire()
+        .thenCompose(connection -> {
+
+          RedisAsyncCommands<String, String> async = connection.async();
+
+          async.multi();
+          async.set("key", "value");
+          async.set("key2", "value2");
+          System.out.println("Executed commands in pipeline");
+          return async.exec().whenComplete((s, throwable) -> pool.release(connection));
+        });
+    transactionResult.join();
+
+    // terminating
+    pool.closeAsync();
+
+    // after pool completion
+    client.shutdownAsync();
+  }
+}
+```
+
+In this setup, `LettuceConnectionFactory` is a custom class you would need to implement, adhering to Apache Commons Pool's `PooledObjectFactory` interface, to manage lifecycle events of pooled `StatefulRedisConnection` objects.
+
+## Connect using Smart client handoffs (SCH)
+
+*Smart client handoffs (SCH)* is a feature of Redis Cloud and
+Redis Software servers that lets them actively notify clients
+about planned server maintenance shortly before it happens. This
+lets a client take action to avoid disruptions in service.
+See [Smart client handoffs](https://redis.io/docs/latest/develop/clients/sch)
+for more information about SCH.
+
+> [!NOTE]
+> Support for SCH in Lettuce requires v7.0.0 or later.
+
+By default, `Lettuce` always attempts to connect via SCH but falls back to
+a non-SCH connection if the server doesn't support it. However, you can configure SCH
+explicitly by creating a `MaintNotificationsConfig` object and/or a `TimeoutOptions`
+object and passing them to the `ClientOptions` builder as shown in the example below.
+Note that SCH also requires the
+[RESP3](https://redis.io/docs/latest/develop/reference/protocol-spec#resp-versions)
+protocol. Lettuce uses this by default, but make sure you don't set
+`protocolVersion(ProtocolVersion.RESP2)` in the `ClientOptions` builder.
+
+```java
+import io.lettuce.core.*;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.protocol.ProtocolVersion;
+import java.time.Duration;
+//  ...
+//  ...
+
+RedisClient redisClient = RedisClient.create("redis://localhost:6379");
+
+MaintNotificationsConfig maintNotificationsConfig = MaintNotificationsConfig.builder()
+        .enableMaintNotifications()
+        // .autoResolveEndpointType() // default is auto-resolve
+        .endpointType(EndpointType.INTERNAL_IP)
+        .build();
+
+TimeoutOptions timeoutOptions = TimeoutOptions.builder()
+        .relaxedTimeoutsDuringMaintenance(Duration.ofSeconds(10))
+        .build();
+
+ClientOptions clientOptions = ClientOptions.builder()
+        .maintNotificationsConfig(maintNotificationsConfig)
+        .timeoutOptions(timeoutOptions)
+        // SCH requires RESP3. Don't override the default protocol version
+        // to RESP2:
+        // .protocolVersion(ProtocolVersion.RESP2) // <- Wrong
+        .build();
+
+redisClient.setOptions(clientOptions);
+
+// or
+ClientOptions clientOptions = ClientOptions.builder()
+        .maintNotificationsConfig(MaintNotificationsConfig.enabled(EndpointType.INTERNAL_IP))
+        .build();
+
+redisClient.setOptions(clientOptions);
+
+// or
+ClientOptions clientOptions = ClientOptions.builder()
+        .maintNotificationsConfig(MaintNotificationsConfig.enabled())
+        .build();
+
+redisClient.setOptions(clientOptions);
+```
+
+To disable SCH, use `MaintNotificationsConfig.disabled()` and pass the instance it
+returns to the `ClientOptions` builder:
+
+```java
+ClientOptions clientOptions = ClientOptions.builder()
+        .maintNotificationsConfig(MaintNotificationsConfig.disabled())
+        .build();
+
+redisClient.setOptions(clientOptions);
+```
+
+The `MaintNotificationsConfig` builder accepts the following options:
+
+| Method | Description |
+|--------|-------------|
+| `enableMaintNotifications(boolean enabled)` | Enable/disable SCH. The default is `true` (enabled). |
+| `endpointType(EndpointType type)` | Set the type of endpoint to use for the connection. The options are `EndpointType.EXTERNAL_IP`, `EndpointType.INTERNAL_IP`, `EndpointType.EXTERNAL_FQDN`, `EndpointType.INTERNAL_FQDN`, and `EndpointType.NONE`. Use the separate `autoResolveEndpointType()` method to auto-detect based on the connection (this is the default behavior). |
+| `autoResolveEndpointType()` | Auto-detect the type of endpoint to use for the connection. This is the default behavior. Use `endpointType()` to set a specific endpoint type. |
+
+Among other options, the `TimeoutOptions` builder accepts the following option
+that is relevant to SCH:
+
+| Method | Description |
+|--------|-------------|
+| `relaxedTimeoutsDuringMaintenance(Duration duration)` | Set the *command* timeout to use while the server is performing maintenance (this doesn't change the connection timeout). The default is 10 seconds. Note that relaxed timeouts are only available for the asynchronous and reactive APIs. |
+|
+
+> [!NOTE]
+> Redis Cloud supports relaxed timeouts *only* (and not pre-handoffs) for SCH if you are using
+> either [AWS PrivateLink](https://redis.io/docs/latest/operate/rc/security/aws-privatelink) or
+> [Google Cloud Private Service Connect](https://redis.io/docs/latest/operate/rc/security/private-service-connect)
+> (see [Smart client handoffs](https://redis.io/docs/latest/develop/clients/sch#redis-cloud) for more information).
+> To use relaxed timeouts with these services, you should set `endpointType(EndpointType.NONE)`
+> when you connect. All other configurations have full support for both relaxed timeouts and pre-handoffs.
+

@@ -1,0 +1,150 @@
+# TS.CREATERULE
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "TS.CREATERULE",
+  "description": "Create a compaction rule.",
+  "categories": ["docs","develop","stack","oss","rs","rc","oss","kubernetes","clients"],
+  "arguments": [{"name":"sourceKey","type":"key"},{"name":"destKey","type":"key"},{"arguments":[{"name":"avg","token":"AVG","type":"pure-token"},{"name":"first","token":"FIRST","type":"pure-token"},{"name":"last","token":"LAST","type":"pure-token"},{"name":"min","token":"MIN","type":"pure-token"},{"name":"max","token":"MAX","type":"pure-token"},{"name":"sum","token":"SUM","type":"pure-token"},{"name":"range","token":"RANGE","type":"pure-token"},{"name":"count","token":"COUNT","type":"pure-token"},{"name":"std.p","token":"STD.P","type":"pure-token"},{"name":"std.s","token":"STD.S","type":"pure-token"},{"name":"var.p","token":"VAR.P","type":"pure-token"},{"name":"var.s","token":"VAR.S","type":"pure-token"},{"name":"twa","since":"1.8.0","token":"TWA","type":"pure-token"},{"name":"countNaN","since":"8.6.0","token":"COUNTNAN","type":"pure-token"},{"name":"countAll","since":"8.6.0","token":"COUNTALL","type":"pure-token"}],"name":"aggregator","token":"AGGREGATION","type":"oneof"},{"name":"bucketDuration","type":"integer"},{"name":"alignTimestamp","optional":true,"since":"1.8.0","type":"integer"}],
+  "syntax_fmt": "TS.CREATERULE sourceKey destKey AGGREGATION \u003cAVG | FIRST | LAST |\n  MIN | MAX | SUM | RANGE | COUNT | STD.P | STD.S | VAR.P | VAR.S |\n  TWA\u003e bucketDuration [alignTimestamp]",
+  "complexity": "O(1)",
+  "group": "timeseries",
+  "acl_categories": ["@timeseries","@write","@fast"],
+  "since": "1.0.0",
+  "tableOfContents": {"sections":[{"id":"required-arguments","title":"Required arguments"},{"id":"optional-arguments","title":"Optional arguments"},{"id":"examples","title":"Examples"},{"id":"redis-software-and-redis-cloud-compatibility","title":"Redis Software and Redis Cloud compatibility"},{"id":"return-information","title":"Return information"},{"id":"see-also","title":"See also"},{"id":"related-topics","title":"Related topics"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+> [!NOTE]
+> This command's behavior varies in clustered Redis environments. See the [multi-key operations](https://redis.io/docs/latest/develop/using-commands/multi-key-operations) page for more information.
+
+
+
+Create a compaction rule
+
+[Examples](#examples)
+
+## Required arguments
+
+<details open><summary><code>sourceKey</code></summary>
+
+is key name for the source time series.
+</details>
+
+<details open><summary><code>destKey</code></summary> 
+
+is key name for destination (compacted) time series. It must be created before `TS.CREATERULE` is called. 
+</details>
+
+<details open><summary><code>AGGREGATION aggregator bucketDuration</code></summary> 
+
+aggregates results into time buckets.
+
+  - `aggregator` takes one of the following aggregation types:
+
+    | `aggregator` | Description                                                     |
+    | ------------ | --------------------------------------------------------------- |
+    | `avg`        | Arithmetic mean of all non-NaN values                           |
+    | `sum`        | Sum of all non-NaN values                                       |
+    | `min`        | Minimum non-NaN value                                           |
+    | `max`        | Maximum non-NaN value                                           |
+    | `range`      | Difference between the maximum and the minimum non-NaN values   |
+    | `count`      | Number of non-NaN values                                        |
+    | `countNaN`   | Number of NaN values (since Redis 8.6)                          |
+    | `countAll`   | Number of values, including NaN and non-NaN (since Redis 8.6)   |
+    | `first`      | The non-NaN value with the lowest timestamp in the bucket       |
+    | `last`       | The non-NaN value with the highest timestamp in the bucket      |
+    | `std.p`      | Population standard deviation of the non-NaN values             |
+    | `std.s`      | Sample standard deviation of the non-NaN values                 |
+    | `var.p`      | Population variance of the non-NaN values                       |
+    | `var.s`      | Sample variance of the non-NaN values                           |
+    | `twa`        | Time-weighted average over the bucket's timeframe (ignores NaN values) (since RedisTimeSeries 1.8) |
+
+  - `bucketDuration` is duration of each bucket, in milliseconds.
+  
+<note><b>Notes</b>
+
+- Only new samples that are added into the source series after the creation of the rule will be aggregated.
+- Calling `TS.CREATERULE` with a nonempty `destKey` may result in inconsistencies between the raw and the compacted data.
+- Explicitly adding samples to a compacted time series (using [`TS.ADD`](https://redis.io/docs/latest/commands/ts.add), [`TS.MADD`](https://redis.io/docs/latest/commands/ts.madd), [`TS.INCRBY`](https://redis.io/docs/latest/commands/ts.incrby), or [`TS.DECRBY`](https://redis.io/docs/latest/commands/ts.decrby)) may result in inconsistencies between the raw and the compacted data. The compaction process may override such samples.
+- If no samples are added to the source time series during a bucket period. no _compacted sample_ is added to the destination time series.
+- The timestamp of a compacted sample added to the destination time series is set to the start timestamp the appropriate compaction bucket. For example, for a 10-minute compaction bucket with no alignment, the compacted samples timestamps are `x:00`, `x:10`, `x:20`, and so on.
+- Deleting `destKey` will cause the compaction rule to be deleted as well.
+
+> [!WARNING]
+> In a clustered environment, you must use [hash tags](https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec#hash-tags) to force `sourceKey` and `destKey` to be stored in the same hash slot. If you don't, Redis may fail to compact the data without displaying any error messages.
+  
+</note>
+
+## Optional arguments
+
+<details open><summary><code>alignTimestamp</code> (since RedisTimeSeries 1.8)</summary>
+
+ensures that there is a bucket that starts exactly at `alignTimestamp` and aligns all other buckets accordingly. It is expressed in milliseconds. The default value is 0: aligned with the Unix epoch.
+
+For example, if `bucketDuration` is 24 hours (`24 * 3600 * 1000`), setting `alignTimestamp` to 6 hours after the Unix epoch (`6 * 3600 * 1000`) ensures that each bucket’s timeframe is `[06:00 .. 06:00)`.
+</details>
+
+## Examples
+
+<details open>
+<summary><b>Create a compaction rule</b></summary>
+
+Create a time series to store the temperatures measured in Tel Aviv.
+
+
+127.0.0.1:6379> TS.CREATE temp:{TLV} LABELS type temp location TLV
+OK
+
+
+Next, create a compacted time series named _dailyAvgTemp_ containing one compacted sample per 24 hours: the time-weighted average of all measurements taken from midnight to next midnight.
+
+
+127.0.0.1:6379> TS.CREATE dailyAvgTemp:{TLV} LABELS type temp location TLV
+127.0.0.1:6379> TS.CREATERULE temp:{TLV} dailyAvgTemp:{TLV} AGGREGATION twa 86400000 
+
+
+Now, also create a compacted time series named _dailyDiffTemp_. This time series will contain one compacted sample per 24 hours: the difference between the minimum and the maximum temperature measured between 06:00 and 06:00 next day.
+ Here, 86400000 is the number of milliseconds in 24 hours, 21600000 is the number of milliseconds in 6 hours.
+
+
+127.0.0.1:6379> TS.CREATE dailyDiffTemp:{TLV} LABELS type temp location TLV
+127.0.0.1:6379> TS.CREATERULE temp:{TLV} dailyDiffTemp:{TLV} AGGREGATION range 86400000 21600000
+
+
+</details>
+
+## Redis Software and Redis Cloud compatibility
+
+| Redis<br />Software | Redis<br />Cloud | <span style="min-width: 9em; display: table-cell">Notes</span> |
+|:----------------------|:-----------------|:------|
+| <span title="Supported">&#x2705; Supported</span><br /> | <span title="Supported">&#x2705; Flexible & Annual</span><br /><span title="Supported">&#x2705; Free & Fixed</nobr></span> |  |
+
+## Return information
+
+**RESP2:**
+
+One of the following:
+* [Simple string reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-strings): `OK` when the compaction rule is created successfully.
+* [Simple error reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-errors) in these cases: invalid arguments, wrong key type, `sourceKey` does not exist, `destKey` does not exist, `sourceKey` is already a destination of a compaction rule, `destKey` is already a source or a destination of a compaction rule, or `sourceKey` and `destKey` are identical.
+
+**RESP3:**
+
+One of the following:
+* [Simple string reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-strings): `OK` when the compaction rule is created successfully.
+* [Simple error reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-errors) in these cases: invalid arguments, wrong key type, `sourceKey` does not exist, `destKey` does not exist, `sourceKey` is already a destination of a compaction rule, `destKey` is already a source or a destination of a compaction rule, or `sourceKey` and `destKey` are identical.
+
+
+
+## See also
+
+[`TS.DELETERULE`](https://redis.io/docs/latest/commands/ts.deleterule) 
+
+## Related topics
+
+[RedisTimeSeries](https://redis.io/docs/latest/develop/data-types/timeseries)
+

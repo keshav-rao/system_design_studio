@@ -1,0 +1,8 @@
+{
+  "docset": "redis-feature-form",
+  "format": "md",
+  "pages": 3,
+  "published_at": "https://redis.io/docs/latest/operate/featureform/",
+  "title": "Redis Feature Form",
+  "version": "latest"
+}

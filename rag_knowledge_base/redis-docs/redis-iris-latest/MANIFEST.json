@@ -1,0 +1,8 @@
+{
+  "docset": "redis-iris",
+  "format": "md",
+  "pages": 33,
+  "published_at": "https://redis.io/docs/latest/operate/iris/",
+  "title": "Redis Iris context engine",
+  "version": "latest"
+}

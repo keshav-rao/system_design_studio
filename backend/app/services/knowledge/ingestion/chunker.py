@@ -92,7 +92,7 @@ class HeadingAwareChunker:
             for i, b in enumerate(blocks):
                 chunks.append(
                     KnowledgeChunk(
-                        id=f"{source_id}-chunk-{i+1}",
+                        id=f"{source_id}-chunk-{i + 1}",
                         source_id=source_id,
                         collection=collection,
                         title=title,

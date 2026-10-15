@@ -1,0 +1,21 @@
+# Preview version
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Preview version",
+  "description": "Describes where to view the preview version for RDI products",
+  "categories": ["docs","operate","rc"],
+  "tableOfContents": {"sections":[]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+RDI is now in general availability but you can still access an
+[archived version of the docs for the preview version](https://docs.redis.com/rdi-preview/rdi/)
+if you need to refer to them. Note that these docs will not be updated and
+information in the current docs supersedes the content of the preview docs.
+

@@ -1,0 +1,163 @@
+# RedisTimeSeries 1.10 release notes
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "RedisTimeSeries 1.10 release notes",
+  "description": "RESP3 support. Performance improvements.",
+  "categories": ["docs","operate","stack"],
+  "tableOfContents": {"sections":[{"id":"requirements","title":"Requirements"},{"id":"v11027-sep-2026","title":"v1.10.27 (Sep 2026)"},{"id":"v11024-may-2026","title":"v1.10.24 (May 2026)"},{"id":"v11020-october-2025","title":"v1.10.20 (October 2025)"},{"id":"v11017-april-2025","title":"v1.10.17 (April 2025)"},{"id":"v11016-january-2025","title":"v1.10.16 (January 2025)"},{"id":"v11012-march-2024","title":"v1.10.12 (March 2024)"},{"id":"v11011-october-2023","title":"v1.10.11 (October 2023)"},{"id":"v1109-october-2023","title":"v1.10.9 (October 2023)"},{"id":"v1106-september-2023","title":"v1.10.6 (September 2023)"},{"children":[{"id":"headlines","title":"Headlines"},{"id":"details","title":"Details"}],"id":"v110-ga-v1104-july-2023","title":"v1.10 GA (v1.10.4) (July 2023)"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+## Requirements
+
+RedisTimeSeries v1.10.27 requires:
+
+- Minimum Redis compatibility version (database): 7.2
+- Minimum Redis Enterprise Software version (cluster): 7.2.4
+
+## v1.10.27 (Sep 2026)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `SECURITY`: There are security fixes in the release.
+
+Details:
+
+- **Security**
+  - Prevent heap buffer overflows and invalid memory access when restoring malformed time-series data.
+
+- Bug fixes:
+  - Fix `TS.INCRBY` replication to preserve the primary’s timestamp when using server-generated timestamps.
+
+## v1.10.24 (May 2026)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `SECURITY`: There are security fixes in the release.
+
+Details:
+
+- **Security:**
+
+  - (CVE-2026-25588) Invalid memory access in `RESTORE` may lead to Remote Code Execution.
+
+## v1.10.20 (October 2025)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `MODERATE`: Program an upgrade of the server, but it's not urgent.
+
+Details:
+
+Bug fixes:
+
+- [#1776](https://github.com/redistimeseries/redistimeseries/pull/1776) Potential crash on `TS.RANGE` with `ALIGN +`, `AGGREGATION twa` and `EMPTY` (MOD-11620, MOD-10484).
+
+Improvements:
+
+- Added support for Rocky Linux 9 and RHEL9 ARM.
+
+## v1.10.17 (April 2025)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `MODERATE`: Plan an upgrade of the server, but it's not urgent.
+
+Details:
+
+Bug fixes:
+- [#1725](https://github.com/redistimeseries/redistimeseries/pull/1725) `TS.DEL` crashes on keys with compactions if the deletion removes the last compaction bucket (MOD-8936)
+- [LibMR#58](https://github.com/RedisGears/LibMR/pull/58) Crash when a cluster contains both 1.8 and newer nodes (MOD-8976, MOD-9192)
+
+Improvements:
+- [#1712](https://github.com/redistimeseries/redistimeseries/pull/1712) Added support for Azure Linux 3 (MOD-9170)
+- [#1736](https://github.com/redistimeseries/redistimeseries/pull/1736) (Redis Enterprise only) Cross-key commands are handled by a random shard rather than the first shard (MOD-9262, MOD-9314)
+
+## v1.10.16 (January 2025)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `SECURITY`: There are security fixes in the release.
+
+Details:
+
+- **Security and privacy:**
+  - [#1673](https://github.com/redistimeseries/redistimeseries/pull/1673) (CVE-2024-51480) `TS.QUERYINDEX`, `TS.MGET`, `TS.MRANGE`, `TS.MREVRANGE` - potential integer overflow leading to an out-of-bounds write (MOD-7548)
+
+- Improvements:
+  - [#1663](https://github.com/redistimeseries/redistimeseries/pull/1663) Added support for Ubuntu 22 and macOS 13 and 14
+
+## v1.10.12 (March 2024)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `LOW`: No need to upgrade unless there are new features you want to use.
+
+Details:
+
+- Improvements:
+
+  - [#1593](https://github.com/RedisTimeSeries/RedisTimeSeries/pull/1593) More detailed LibMR error messages
+
+## v1.10.11 (October 2023)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `LOW`: No need to upgrade unless there are new features you want to use.
+
+Details:
+
+- Bug fixes:
+
+  - [LibMR#51](https://github.com/RedisGears/LibMR/pull/51) Crash on SSL initialization failure (MOD-5647)
+  - [#1538](https://github.com/RedisTimeSeries/RedisTimeSeries/pull/1538) Amazon Linux 2: crash on SSL initialization. We now use openssl11-devel instead of openssl-devel (MOD-6015)
+
+## v1.10.9 (October 2023)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `LOW`: No need to upgrade unless there are new features you want to use.
+
+Details:
+
+- Improvements:
+
+  - [#1516](https://github.com/RedisTimeSeries/RedisTimeSeries/pull/1516) Added support for CBL-Mariner 2
+  - [#1514](https://github.com/RedisTimeSeries/RedisTimeSeries/pull/1514) Added support for Rocky Linux 9 and RHEL9
+
+## v1.10.6 (September 2023)
+
+This is a maintenance release for RedisTimeSeries 1.10.
+
+Update urgency: `SECURITY`: There are security fixes in the release.
+
+Details:
+
+- Security and privacy:
+
+  - [#1506](https://github.com/RedisTimeSeries/RedisTimeSeries/pull/1506) Don’t expose internal commands (MOD-5643)
+
+## v1.10 GA (v1.10.4) (July 2023)
+
+This is the General Availability release of RedisTimeSeries 1.10.
+
+### Headlines
+
+RedisTimeSeries 1.10 introduces support for RESP3, performance improvements, and bug fixes.
+
+### Details
+
+Bug fixes (since 1.10-RC3):
+
+- [#1494](https://github.com/RedisTimeSeries/RedisTimeSeries/issues/1494) Potential crash when using an invalid argument value
+
+> [!NOTE]
+> - The version inside Redis will be 1.10.4 in semantic versioning. Since the version of a module in Redis is numeric, we could not add a GA flag.
+>
+> - Minimal Redis version: 7.2
+

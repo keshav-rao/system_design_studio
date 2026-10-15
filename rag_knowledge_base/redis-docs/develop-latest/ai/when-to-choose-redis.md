@@ -1,0 +1,156 @@
+# When to choose Redis over alternatives
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "When to choose Redis over alternatives",
+  "description": "Determine when Redis is the optimal choice compared to other databases",
+  "categories": null,
+  "tableOfContents": {"sections":[{"id":"redis-vs-pinecone","title":"Redis vs Pinecone"},{"id":"redis-vs-mongodb","title":"Redis vs MongoDB"},{"id":"redis-vs-postgres","title":"Redis vs Postgres"},{"id":"decision-matrix","title":"Decision matrix"},{"id":"selection-criteria","title":"Selection criteria"},{"id":"related-topics","title":"Related topics"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+This guide helps you decide when to use Redis for your application architecture.
+
+## Redis vs Pinecone
+
+Choose Redis when your application needs:
+
+- State and memory in one database: Redis provides both key-value storage for application state and vector search for semantic memory in a single database.
+- Simplified architecture: Avoid managing two separate database connections (one for state, one for vectors).
+- Sub-millisecond latency: Both vector search and data operations respond in under one millisecond.
+- Unified caching and search: Store frequently accessed data alongside vector embeddings.
+- Transactional consistency: Perform atomic operations across state and memory.
+- Agent memory: Session and long-term memory without building your own vector index.
+- Semantic caching: Return cached LLM responses for semantically similar prompts.
+
+Example: An AI agent that maintains conversation history (state), performs semantic search over past conversations (vectors), and caches API responses (key-value) with sub-millisecond latency.
+
+## Redis vs MongoDB
+
+Choose Redis when your application needs:
+
+- Real-time data patterns: Use Pub/Sub, Streams, and instant cache updates.
+- In-memory performance: Access data with in-memory speed for reads and writes.
+- Simple data structures with complex queries: Work with [Lists](https://redis.io/docs/latest/develop/data-types/lists), [Sets](https://redis.io/docs/latest/develop/data-types/sets), [Sorted Sets](https://redis.io/docs/latest/develop/data-types/sorted-sets), [Hashes](https://redis.io/docs/latest/develop/data-types/hashes), and [JSON](https://redis.io/docs/latest/develop/data-types/json) documents with vector search.
+- Horizontal scalability: Scale with built-in clustering and sharding.
+
+Example: A real-time recommendation engine that processes user events via Streams, caches user profiles in Hashes, maintains session state, and performs vector similarity search on user embeddings.
+
+## Redis vs Postgres
+
+Choose Redis when your application needs:
+
+- Sub-millisecond response times: Applications that require responses in under 10 milliseconds.
+- Streaming and pub/sub patterns: Real-time data processing with Redis Streams.
+- High-throughput workloads: Process millions of operations per second.
+- Flexible data modeling: Store schema-less JSON documents, time-series data, and vectors.
+- Simplified deployment: Avoid query planner tuning or index optimization.
+- Context retrieval: Give agents governed tools to query business data instead of direct database access.
+
+Example: A live analytics dashboard that ingests events via Streams, maintains counters in Sorted Sets, caches computed results, and performs real-time vector similarity search on user behavior patterns.
+
+You don't have to replace Postgres to get these benefits. [Redis Data Integration](https://redis.io/docs/latest/develop/ai/context-engine/data-integration) streams changes from PostgreSQL and other relational databases into Redis within seconds. Postgres stays your system of record, and your application or agents read from Redis.
+
+## Decision matrix
+
+Use Redis when your application needs:
+
+- Vector search and state in one database
+- Sub-millisecond latency
+- Real-time streaming
+- Pub/Sub messaging
+- Agent memory, semantic caching, or context retrieval
+
+## Selection criteria
+
+Use this decision tree to determine if Redis is the right choice for your use case:
+
+```decision-tree {id="redis-selection-tree"}
+id: redis-selection-tree
+scope: database-selection
+rootQuestion: agent-context
+questions:
+    agent-context:
+        text: "Do you need agent memory, semantic caching, or context retrieval?"
+        whyAsk: "Redis provides agent memory, semantic caching, and governed context retrieval for AI agents through the Redis Iris services"
+        answers:
+            yes:
+                value: "Yes"
+                outcome:
+                    label: "Choose Redis"
+                    id: redis-agent-context
+                    sentiment: positive
+            no:
+                value: "No"
+                nextQuestion: state-and-vectors
+    state-and-vectors:
+        text: "Do you need both state management and vector search in one database?"
+        whyAsk: "Redis combines key-value storage and vector search, eliminating the need for separate databases - this is Redis's key AI differentiator"
+        answers:
+            yes:
+                value: "Yes"
+                outcome:
+                    label: "Choose Redis"
+                    id: redis-unified
+                    sentiment: positive
+            no:
+                value: "No"
+                nextQuestion: latency
+    latency:
+        text: "Do you need sub-10ms response times?"
+        whyAsk: "Redis provides sub-millisecond latency for both reads and writes, which is critical for real-time applications"
+        answers:
+            yes:
+                value: "Yes"
+                outcome:
+                    label: "Choose Redis"
+                    id: redis-latency
+                    sentiment: positive
+            no:
+                value: "No"
+                nextQuestion: realtime
+    realtime:
+        text: "Do you need real-time streaming, pub/sub, or event processing?"
+        whyAsk: "Redis Streams and Pub/Sub provide built-in real-time messaging patterns"
+        answers:
+            yes:
+                value: "Yes"
+                outcome:
+                    label: "Choose Redis"
+                    id: redis-realtime
+                    sentiment: positive
+            no:
+                value: "No"
+                nextQuestion: complexity
+    complexity:
+        text: "Do you want minimal operational complexity?"
+        whyAsk: "Redis requires minimal configuration compared to traditional relational databases"
+        answers:
+            yes:
+                value: "Yes"
+                outcome:
+                    label: "Choose Redis"
+                    id: redis-simple
+                    sentiment: positive
+            no:
+                value: "No"
+                outcome:
+                    label: "Consider alternatives"
+                    id: alternatives
+                    sentiment: indeterminate
+```
+
+## Related topics
+
+- [Redis for AI applications](https://redis.io/docs/latest/develop/ai)
+- [Redis Iris context engine](https://redis.io/docs/latest/develop/ai/context-engine)
+- [Redis Streams documentation](https://redis.io/docs/latest/develop/data-types/streams)
+- [Redis JSON documentation](https://redis.io/docs/latest/develop/data-types/json)
+- [Redis client libraries](https://redis.io/docs/latest/develop/clients)
+
+

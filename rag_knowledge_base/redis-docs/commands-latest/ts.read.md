@@ -1,0 +1,251 @@
+# TS.READ
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "TS.READ",
+  "description": "Read: return up to max_count samples with timestamp \u003e= timestamp. With BLOCK, waits up to milliseconds ms until at least min_count qualifying samples exist",
+  "categories": ["docs","develop","stack","oss","rs","rc","oss","kubernetes","clients"],
+  "arguments": [{"display_text":"key","key_spec_index":0,"name":"key","type":"key"},{"display_text":"timestamp","name":"timestamp","type":"string"},{"arguments":[{"display_text":"milliseconds","name":"milliseconds","token":"BLOCK","type":"integer"},{"display_text":"min_count","name":"min_count","type":"integer"}],"name":"BLOCK","optional":true,"type":"block"},{"arguments":[{"display_text":"max_count","name":"max_count","token":"MAX_COUNT","type":"integer"}],"name":"MAX_COUNT","optional":true,"type":"block"}],
+  "syntax_fmt": "TS.READ key timestamp [BLOCK milliseconds min_count]\n  [MAX_COUNT max_count]",
+  "complexity": "O(log(n)+k) where n is the number of samples in the series and k is the number of returned samples",
+  "group": "timeseries",
+  "command_flags": ["readonly","module"],
+  "acl_categories": ["@read","@timeseries"],
+  "since": "8.10.0",
+  "arity": -3,
+  "key_specs": [{"RO":true,"begin_search":{"spec":{"index":1},"type":"index"},"find_keys":{"spec":{"keystep":1,"lastkey":0,"limit":0},"type":"range"}}],
+  "tableOfContents": {"sections":[{"id":"required-arguments","title":"Required arguments"},{"id":"optional-arguments","title":"Optional arguments"},{"id":"examples","title":"Examples"},{"children":[{"id":"when-to-use-tsread","title":"When to use TS.READ"},{"id":"blocking-and-retrieval-semantics","title":"Blocking and retrieval semantics"}],"id":"details","title":"Details"},{"id":"redis-software-and-redis-cloud-compatibility","title":"Redis Software and Redis Cloud compatibility"},{"id":"return-information","title":"Return information"},{"id":"see-also","title":"See also"},{"id":"related-topics","title":"Related topics"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+Read a batch of time series samples at or after a given timestamp, returning up to `max_count` of the oldest qualifying samples ordered by increasing timestamp. By default `TS.READ` returns immediately with whatever is available; add the optional `BLOCK` keyword to wait until at least `min_count` samples exist or `milliseconds` elapse, whichever occurs first.
+
+The key may be a regular time series or a compaction time series.
+
+[Examples](#examples)
+
+## Required arguments
+
+<details open>
+<summary><code>key</code></summary>
+
+is the key name for the time series. It may identify a regular series or a compaction series.
+</details>
+
+<details open>
+<summary><code>timestamp</code></summary>
+
+is the inclusive lower-bound cursor for the read. The command selects samples whose timestamp is greater than or equal to the resolved cursor (`sample_timestamp >= resolved_timestamp`).
+
+`timestamp` is either a non-negative integer Unix timestamp in milliseconds or one of the sentinels `-`, `+`, or `$`:
+
+| Value                | Name          | Description |
+| -------------------- | ------------- | ----------- |
+| Non-negative integer | Literal cursor | A Unix timestamp in milliseconds. Matching is inclusive. `0` is accepted and reads from the beginning. |
+| `-`                  | Earliest      | The timestamp of the earliest sample in the series, or `0` when the series is empty or does not exist. |
+| `+`                  | Latest        | The timestamp of the latest sample in the series, or `0` when the series is empty or does not exist. The cursor is inclusive, so the latest existing sample itself qualifies (aligned with [`TS.RANGE`](https://redis.io/docs/latest/commands/ts.range)). Without `BLOCK`, the call returns that sample immediately; with `BLOCK` and a `min_count` greater than `1`, it blocks until enough samples at or after that timestamp exist. Intended for the first call only. |
+| `$`                  | New           | The timestamp of the latest sample plus 1, or `0` when the series is empty or does not exist. Only samples reported after the command was received by the server qualify; the latest existing sample is excluded. |
+
+The `+` and `$` semantics mirror the special IDs of [`XREAD`](https://redis.io/docs/latest/commands/xread) and [`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup). The server resolves all sentinels exactly once, when the command is received, so the cursor stays stable while the client is blocked. Send `-`, `+`, and `$` to the server as-is; do not resolve them on the client side.
+
+Use the following table to choose the cursor for the first call:
+
+| Goal                                          | First-call `timestamp` |
+| --------------------------------------------- | ---------------------- |
+| Read the full history, then new samples       | `-` or `0`             |
+| Start from the current latest sample, inclusive | `+`                  |
+| Receive only samples added after the call     | `$`                    |
+
+For every subsequent call, use `last_returned_timestamp + 1` so you receive no misses and no duplicates. Do not reuse `+` or `$` after the first call. If no samples are returned, you can retry with the same cursor, subject to your application's delivery policy.
+</details>
+
+## Optional arguments
+
+<details open>
+<summary><code>BLOCK milliseconds min_count</code></summary>
+
+makes the command block instead of returning immediately. When `BLOCK` is present, the command waits until at least `min_count` qualifying samples are available, until `milliseconds` elapse, or until the key is removed, whichever occurs first.
+
+`milliseconds` is a non-negative integer timeout. A value of `0` means block indefinitely, until `min_count` samples become available or the key is removed (the same convention as [`BLPOP`](https://redis.io/docs/latest/commands/blpop) and `XREAD BLOCK 0`).
+
+`min_count` is the unblock threshold: the number of qualifying samples required before the command returns ahead of the timeout. It must be a positive integer. When `BLOCK` is omitted, the command does not block and returns whatever is available immediately, even when no samples qualify.
+</details>
+
+<details open>
+<summary><code>MAX_COUNT max_count</code></summary>
+
+is the reply cap: the maximum number of samples to return. It must be a positive integer and, when `BLOCK` is used, greater than or equal to `min_count`. When `MAX_COUNT` is not provided, the reply is unbounded. When more matching samples exist than `max_count`, the server returns the oldest `max_count` samples first, so you can page forward.
+
+`MAX_COUNT` defaults to unlimited; set it explicitly when consuming large histories to bound the reply size and enable paging.
+</details>
+
+The `BLOCK` and `MAX_COUNT` keywords are optional, independent, and can be given in either order. Omit `BLOCK` to read without blocking; omit `MAX_COUNT` to leave the reply size unbounded. A keyword without its values, or any stray trailing token, is rejected as a wrong-arity error.
+
+## Examples
+
+<details open>
+<summary><b>Read history without blocking</b></summary>
+
+Create a time series and add three samples.
+
+```
+127.0.0.1:6379> TS.CREATE sensor:1
+OK
+127.0.0.1:6379> TS.ADD sensor:1 100 1.0
+(integer) 100
+127.0.0.1:6379> TS.ADD sensor:1 200 2.0
+(integer) 200
+127.0.0.1:6379> TS.ADD sensor:1 300 3.0
+(integer) 300
+```
+
+Read all historical samples without blocking. With no `BLOCK` keyword the command returns immediately, and `max_count` is unlimited.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 0
+1) 1) (integer) 100
+   2) 1
+2) 1) (integer) 200
+   2) 2
+3) 1) (integer) 300
+   2) 3
+```
+
+The `-` sentinel is equivalent for a full read from the earliest sample.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 -
+```
+</details>
+
+<details open>
+<summary><b>Page through history in bounded batches</b></summary>
+
+Read at most two samples per call, advancing the cursor to `last_returned_timestamp + 1` on each subsequent call.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 - MAX_COUNT 2
+1) 1) (integer) 100
+   2) 1
+2) 1) (integer) 200
+   2) 2
+127.0.0.1:6379> TS.READ sensor:1 201 MAX_COUNT 2
+1) 1) (integer) 300
+   2) 3
+```
+</details>
+
+<details open>
+<summary><b>Start from the latest sample</b></summary>
+
+Start from the current latest sample (inclusive). Without `BLOCK`, this returns immediately.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 +
+1) 1) (integer) 300
+   2) 3
+```
+
+With `BLOCK 5000 2`, the same `+` call blocks until a second sample with timestamp greater than or equal to 300 arrives, or returns the available samples after 5000 milliseconds.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 + BLOCK 5000 2
+```
+</details>
+
+<details open>
+<summary><b>Tail only new samples</b></summary>
+
+Use `$` to ignore everything that already exists and receive only samples added after the call. `BLOCK 5000 1` waits up to 5000 milliseconds for the first new sample.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 $ BLOCK 5000 1
+```
+
+If another client runs `TS.ADD sensor:1 400 4.0` within 5000 milliseconds, the blocked call returns `[[400, 4]]`. If no new sample arrives, it returns an empty array.
+</details>
+
+<details open>
+<summary><b>Partial flush on timeout</b></summary>
+
+When `min_count` cannot be reached, the command returns the available samples after the timeout. Here `BLOCK 1000 10` cannot reach 10 samples, so the two qualifying samples are returned after 1000 milliseconds.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 101 BLOCK 1000 10
+1) 1) (integer) 200
+   2) 2
+2) 1) (integer) 300
+   2) 3
+```
+
+When nothing qualifies by the timeout, the reply is an empty array.
+
+```
+127.0.0.1:6379> TS.READ sensor:1 301 BLOCK 1000 1
+(empty array)
+```
+</details>
+
+<details open>
+<summary><b>Read from a compaction series</b></summary>
+
+`key` may be a compaction series. The command can return compaction samples and, with `BLOCK`, can wait for future compaction output.
+
+```
+127.0.0.1:6379> TS.READ sensor:1:avg - BLOCK 10000 1
+```
+</details>
+
+## Details
+
+### When to use `TS.READ`
+
+Applications often render charts from time series data — metrics, sensor readings, financial prices and volumes, or application telemetry — and need to keep those charts current as new samples arrive. Without `TS.READ`, an application typically either polls [`TS.RANGE`](https://redis.io/docs/latest/commands/ts.range) at a fixed interval and checks for samples added since the previous request, or listens for keyspace notifications. Both approaches work, but they require periodic polling or additional notification handling.
+
+`TS.READ` replaces that with a single, optionally blocking read: the application issues one call and waits until new samples are available, then appends them and repeats. This suits anything that streams updates continuously — monitoring dashboards, live charts, financial terminals, IoT sensor feeds, or alerting systems — without issuing repeated range queries when no new sample has been added.
+
+### Blocking and retrieval semantics
+
+- From `key`, the command reads samples whose timestamp is greater than or equal to the resolved cursor.
+- Without `BLOCK`, the command never blocks: it returns up to `max_count` of the oldest qualifying samples immediately, even when no samples qualify (an empty array).
+- With `BLOCK milliseconds min_count`, if at least `min_count` matching samples are already available, the server returns immediately with up to `max_count` of the oldest qualifying samples.
+- With `BLOCK` and fewer than `min_count` matching samples available, the server blocks until `min_count` is reached, `milliseconds` elapse, or the key is removed. `BLOCK 0` blocks indefinitely. Each sample append ([`TS.ADD`](https://redis.io/docs/latest/commands/ts.add), [`TS.MADD`](https://redis.io/docs/latest/commands/ts.madd), [`TS.INCRBY`](https://redis.io/docs/latest/commands/ts.incrby), [`TS.DECRBY`](https://redis.io/docs/latest/commands/ts.decrby), and compaction-rule writes to the destination key) can unblock a blocked client.
+- On timeout, the server returns whatever is available, which can be an empty array or fewer than `min_count` samples. This is a successful reply, not an error.
+- If the key is removed while the client is blocked (`DEL`, `UNLINK`, `FLUSHDB`, `FLUSHALL`, expiry, or eviction), the server returns an empty list to the blocked client. This is a successful reply, not an error.
+- Returned samples are sorted by increasing timestamp, including when samples were inserted out of order.
+- Multiple blocked clients waiting on the same key wait independently. One client receiving samples does not consume them for another client.
+
+## Redis Software and Redis Cloud compatibility
+
+| Redis<br />Software | Redis<br />Cloud | <span style="min-width: 9em; display: table-cell">Notes</span> |
+|:----------------------|:-----------------|:------|
+| <span title="Not supported">&#x274c; Not supported</span><br /> | <span title="Not supported">&#x274c; Flexible & Annual</span><br /><span title="Not supported">&#x274c; Free & Fixed</nobr></span> |  |
+
+## Return information
+
+**RESP2:**
+
+One of the following:
+* [Array reply](https://redis.io/docs/latest/develop/reference/protocol-spec#arrays) of ([Integer reply](https://redis.io/docs/latest/develop/reference/protocol-spec#integers), [Simple string reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-strings)) pairs representing (timestamp, value), ordered by increasing timestamp. The array is empty when no matching samples are available by the time the command returns, or when the key was removed while the command was blocked.
+* [Simple error reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-errors) in these cases: invalid timestamp, invalid `milliseconds`, invalid `min_count` or `max_count`, `min_count` greater than `max_count`, wrong number of arguments, wrong key type, the command is used with `BLOCK` where blocking is not allowed (for example, inside `MULTI` or a Lua script), etc.
+
+**RESP3:**
+
+One of the following:
+* [Array reply](https://redis.io/docs/latest/develop/reference/protocol-spec#arrays) of ([Integer reply](https://redis.io/docs/latest/develop/reference/protocol-spec#integers), [Double reply](https://redis.io/docs/latest/develop/reference/protocol-spec#doubles)) pairs representing (timestamp, value), ordered by increasing timestamp. The array is empty when no matching samples are available by the time the command returns, or when the key was removed while the command was blocked.
+* [Simple error reply](https://redis.io/docs/latest/develop/reference/protocol-spec#simple-errors) in these cases: invalid timestamp, invalid `milliseconds`, invalid `min_count` or `max_count`, `min_count` greater than `max_count`, wrong number of arguments, wrong key type, the command is used with `BLOCK` where blocking is not allowed (for example, inside `MULTI` or a Lua script), etc.
+
+
+
+## See also
+
+[`TS.GET`](https://redis.io/docs/latest/commands/ts.get) | [`TS.RANGE`](https://redis.io/docs/latest/commands/ts.range) | [`TS.REVRANGE`](https://redis.io/docs/latest/commands/ts.revrange)
+
+## Related topics
+
+[RedisTimeSeries](https://redis.io/docs/latest/develop/data-types/timeseries)
+

@@ -1,0 +1,22 @@
+# BDB usage report job settings object
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "BDB usage report job settings object",
+  "description": "Documents the bdb_usage_report_job_settings object used with Redis Software REST API calls.",
+  "categories": ["docs","operate","rs"],
+  "tableOfContents": {"sections":[]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+| Name | Type/Value | Description |
+|------|------------|-------------|
+| cron_expression | string | [CRON expression](https://en.wikipedia.org/wiki/Cron#CRON_expression) that defines the database usage report schedule |
+| enabled | boolean (default: true) | Indicates whether this job is enabled |
+| file_retention_days | integer, 1-1000 (default: 365) | Number of days after a file is closed before it is deleted |
+

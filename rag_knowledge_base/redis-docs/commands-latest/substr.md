@@ -1,0 +1,86 @@
+# SUBSTR
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "SUBSTR",
+  "description": "Returns a substring from a string value.",
+  "categories": ["docs","develop","stack","oss","rs","rc","oss","kubernetes","clients"],
+  "arguments": [{"display_text":"key","key_spec_index":0,"name":"key","type":"key"},{"display_text":"start","name":"start","type":"integer"},{"display_text":"end","name":"end","type":"integer"}],
+  "syntax_fmt": "SUBSTR key start end",
+  "complexity": "O(N) where N is the length of the returned string. The complexity is ultimately determined by the returned length, but because creating a substring from an existing string is very cheap, it can be considered O(1) for small strings.",
+  "group": "string",
+  "command_flags": ["readonly"],
+  "acl_categories": ["@read","@string","@slow"],
+  "since": "1.0.0",
+  "arity": 4,
+  "key_specs": [{"RO":true,"access":true,"begin_search":{"spec":{"index":1},"type":"index"},"find_keys":{"spec":{"keystep":1,"lastkey":0,"limit":0},"type":"range"}}],
+  "tableOfContents": {"sections":[{"id":"required-arguments","title":"Required arguments"},{"id":"examples","title":"Examples"},{"id":"redis-software-and-redis-cloud-compatibility","title":"Redis Software and Redis Cloud compatibility"},{"id":"return-information","title":"Return information"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+Returns the substring of the string value stored at `key`, determined by the
+offsets `start` and `end` (both are inclusive).
+Negative offsets can be used in order to provide an offset starting from the end
+of the string.
+For example, -1 is the last character, -2 is the penultimate character, and so on.
+
+The function handles out of range requests by limiting the resulting range to
+the actual length of the string.
+
+## Required arguments
+
+<details open><summary><code>key</code></summary>
+
+The name of the key.
+
+</details>
+
+<details open><summary><code>start</code></summary>
+
+The start offset, zero-based. A negative value counts from the end of the string.
+
+</details>
+
+<details open><summary><code>end</code></summary>
+
+The end offset, zero-based and inclusive. A negative value counts from the end of the string.
+
+</details>
+
+## Examples
+
+
+redis> SET mykey "This is a string"
+OK
+redis> GETRANGE mykey 0 3
+"This"
+redis> GETRANGE mykey -3 -1
+"ing"
+redis> GETRANGE mykey 0 -1
+"This is a string"
+redis> GETRANGE mykey 10 100
+"string"
+
+
+## Redis Software and Redis Cloud compatibility
+
+| Redis<br />Software | Redis<br />Cloud | <span style="min-width: 9em; display: table-cell">Notes</span> |
+|:----------------------|:-----------------|:------|
+| <span title="Not supported">&#x274c; Standard</span><br /><span title="Not supported"><nobr>&#x274c; Active-Active</nobr></span> | <span title="Not supported">&#x274c; Standard</span><br /><span title="Not supported"><nobr>&#x274c; Active-Active</nobr></span> | Deprecated as of Redis v2.0.0. |
+
+## Return information
+
+**RESP2:**
+
+[Bulk string reply](../../develop/reference/protocol-spec#bulk-strings): the substring of the string value stored at key, determined by the offsets start and end (both are inclusive).
+
+**RESP3:**
+
+[Bulk string reply](../../develop/reference/protocol-spec#bulk-strings): the substring of the string value stored at key, determined by the offsets start and end (both are inclusive).
+
+
+

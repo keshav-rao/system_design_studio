@@ -1,0 +1,56 @@
+# Recover a Redis Enterprise cluster on Kubernetes
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Recover a Redis Enterprise cluster on Kubernetes",
+  "description": "This task describes how to recover a Redis Enterprise cluster on Kubernetes.",
+  "categories": ["docs","operate","kubernetes"],
+  "tableOfContents": {"sections":[{"id":"prerequisites","title":"Prerequisites"},{"id":"recover-a-cluster","title":"Recover a cluster"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+When a Redis Enterprise cluster loses contact with more than half of its nodes either because of failed nodes or network split,
+the cluster stops responding to client connections.
+When this happens, you must recover the cluster to restore the connections.
+
+You can also perform cluster recovery to reset cluster nodes, to troubleshoot issues, or in a case of active/passive failover.
+
+The Redis Enterprise for Kubernetes automates these recovery steps:
+
+1. Recreates a fresh Redis Enterprise cluster
+1. Mounts the persistent storage with the recovery files from the original cluster to the nodes of the new cluster
+1. Recovers the cluster configuration on the first node in the new cluster
+1. Joins the remaining nodes to the new cluster.
+
+> [!WARNING]
+> Redis Enterprise for Kubernetes 7.2.4-2 introduces a new limitation. You cannot recover or upgrade your cluster if there are databases with old module versions or manually uploaded modules. See the [Redis Enterprise Software 7.2.4 known limitations](https://redis.io/docs/latest/operate/rs/release-notes/rs-7-2-4-releases/rs-7-2-4-52#cluster-recovery-with-manually-uploaded-modules) for more details.
+
+> [!NOTE]
+> If your cluster uses user-defined modules, the recovery process doesn't block on module validation errors (such as URL or credential issues). The cluster can recover successfully, and you can resolve any module configuration issues after recovery is complete. See [User-defined modules](https://redis.io/docs/latest/operate/kubernetes/re-databases/modules#user-defined-modules) for more information.
+
+## Prerequisites
+
+- For cluster recovery, the cluster must be [deployed with persistence](https://redis.io/docs/latest/operate/kubernetes/recommendations/persistent-volumes).
+
+## Recover a cluster
+
+1. Edit the REC resource to set the `clusterRecovery` flag to `true`.
+
+    ```sh
+    kubectl patch rec <cluster-name> -n <rec_namespace> --type merge --patch '{"spec":{"clusterRecovery":true}}'
+    ```
+
+
+1. Wait for the cluster to recover until it is in the "Running" state.
+
+    To see the state of the cluster, run:
+
+    ```sh
+    watch "kubectl describe rec | grep State"
+    ```
+
+1. To recover the database, see [Recover a failed database](https://redis.io/docs/latest/operate/rs/databases/recover).

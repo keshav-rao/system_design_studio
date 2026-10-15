@@ -1,0 +1,129 @@
+# CLI reference
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "CLI reference",
+  "description": "Reference for the RDI CLI commands",
+  "categories": ["docs","integrate","rs","rdi"],
+  "group": "di",
+  "tableOfContents": {"sections":[{"id":"connecting-to-the-api","title":"Connecting to the API"},{"id":"contexts","title":"Contexts"},{"id":"commands","title":"Commands"},{"id":"output-formats","title":"Output formats"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+`redis-di` is the command line tool that manages Redis Data Integration (RDI).
+It is a thin client over the RDI REST API, so it works the same way for all
+installation types: [VM](https://redis.io/docs/latest/integrate/redis-data-integration/installation/install-vm),
+[Kubernetes](https://redis.io/docs/latest/integrate/redis-data-integration/installation/install-k8s), and Redis Cloud.
+Use it to deploy pipelines, manage secrets, inspect status and metrics, and read rejected records.
+
+> [!NOTE]
+> RDI 1.19.0 introduced the current API-based CLI. If you are moving from an earlier RDI version,
+> see [Compare the previous and current RDI CLI](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/previous-cli-comparison)
+> for the connection, context, command, and output changes.
+
+## Connecting to the API
+
+Most commands connect to the RDI API, which you specify with the `--api-url` option (or the
+`RDI_API_URL` environment variable). Because the API is served over HTTPS, you can also supply
+`--cacert` to trust a private or self-signed certificate, or `--insecure` to skip TLS verification.
+
+The CLI supports three authentication modes, selected by the credentials you provide:
+
+- **User authentication** (JWT): when you set a `--user`, the CLI logs in with that user and a
+  password from `--password`, the `RDI_PASSWORD` environment variable, or an interactive prompt.
+  This is the usual mode for VM and Kubernetes installations.
+- **Redis Cloud authentication**: when you set an `--account-key`, the CLI authenticates to the
+  Redis Cloud API gateway with that account key and a user key from `--user-key`, the `RDI_USER_KEY`
+  environment variable, or an interactive prompt. This is the mode for RDI running in Redis Cloud.
+- **No authentication**: when you set neither a user nor an account key, the CLI connects without
+  authenticating, which is the mode to use when authentication is disabled in the API.
+
+Setting both `--user` and `--account-key` is an error, as is setting both `--cacert` and `--insecure`.
+Passwords and user keys are secrets and are never stored on disk.
+
+## Contexts
+
+Instead of passing the connection options on every command, you can save them in a _context_.
+Contexts are stored in a `~/.redis-di` file that holds a map of named contexts and the active one,
+similar to a `kubeconfig` file. Each context sets an `api-url`, an optional `user` or `account-key`,
+and either a `cacert` or `insecure: true`. Secrets (the password and user key) are never stored, so
+you still supply them per session.
+
+```yaml
+# ~/.redis-di
+current-context: prod
+contexts:
+  prod:
+    api-url: https://rdi.example.com
+    user: default
+    cacert: /etc/rdi/ingress-ca.crt
+  dev:
+    api-url: https://localhost:8443
+    insecure: true
+```
+
+Use the [`set-context`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-set-context)
+and [`use-context`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-use-context)
+commands to create and select contexts rather than editing the file by hand.
+
+## Commands
+
+Pipeline-scoped commands take the pipeline name as an optional positional argument that defaults to
+`default`, for example `redis-di start [pipeline]`. Sub-resource commands (for a secret, DLQ, or job)
+take their own key or name as the positional argument and target the pipeline with the `-p` / `--pipeline`
+option, which also defaults to `default`.
+
+There are two command options that select a particular database of the pipeline. The secret commands take `--db` with
+a source name or `target` to address that database's secrets, and the `start`, `stop`, and `reset` commands take
+`--source` with a source name to act on that source alone. See
+[Multiple sources in one pipeline](https://redis.io/docs/latest/integrate/redis-data-integration/data-pipelines/multiple-sources) for more information.
+
+The commands group as follows:
+
+- **Information**: [`info`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-info).
+- **Pipelines**: [`list`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list),
+  [`get`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-get),
+  [`describe`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-describe) (alias `status`),
+  [`deploy`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-deploy) (alias `set`),
+  [`start`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-start),
+  [`stop`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-stop), and
+  [`reset`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-reset).
+- **Secrets**: [`list-secrets`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list-secrets),
+  [`get-secret`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-get-secret),
+  [`describe-secret`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-describe-secret),
+  [`set-secret`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-set-secret), and
+  [`delete-secret`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-delete-secret).
+- **Dead-letter queues**: [`list-dlqs`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list-dlqs),
+  [`get-dlq`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-get-dlq), and
+  [`list-dlq-records`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list-dlq-records) (alias `get-rejected`).
+- **Jobs**: [`list-jobs`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list-jobs),
+  [`get-job`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-get-job), and
+  [`describe-job`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-describe-job).
+- **Metric collections**: [`list-metric-collections`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list-metric-collections) and
+  [`get-metric-collection`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-get-metric-collection).
+- **Scaffolding**: [`scaffold`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-scaffold)
+- **Contexts**: [`list-contexts`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-list-contexts),
+  [`describe-context`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-describe-context),
+  [`set-context`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-set-context),
+  [`use-context`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-use-context), and
+  [`delete-context`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-delete-context).
+
+On VM installations, the CLI also exposes the
+[`configure-rdi`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-configure-rdi) and
+[`dump-support-package`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di-dump-support-package)
+administration commands.
+
+See the [`redis-di`](https://redis.io/docs/latest/integrate/redis-data-integration/reference/cli/redis-di) page for the
+global options that apply to every command.
+
+## Output formats
+
+The `list` and `get` commands print an aligned, column-based table by default. Pass `-o` / `--output`
+with `json` or `yaml` to emit the underlying data instead, which is useful for scripting and for tools
+such as `jq`. The `describe` commands always print a human-readable, sectioned layout.
+

@@ -1,0 +1,62 @@
+# Map LDAP groups to roles
+
+```json metadata
+{
+  "schema_version": 2,
+  "title": "Map LDAP groups to roles",
+  "description": "Describes how to map LDAP authorization groups to Redis Software roles using the Cluster Manager UI.",
+  "categories": ["docs","operate","rs"],
+  "tableOfContents": {"sections":[{"id":"map-ldap-groups-to-roles","title":"Map LDAP groups to roles"},{"id":"more-info","title":"More info"}]}
+
+,
+  "codeExamples": []
+}
+```
+
+
+Redis Software uses a role-based mechanism to enable LDAP authentication and authorization.  
+
+Once LDAP is enabled, you need to map LDAP groups to Redis Software access control roles.
+
+## Map LDAP groups to roles
+
+To map LDAP groups to access control roles in the Cluster Manager UI:
+
+1. Select **Access Control > LDAP > Mapping**.
+
+    > [!NOTE]
+    > You can map LDAP roles when LDAP configuration is not enabled, but they won't have any effect until you [configure and enable LDAP](https://redis.io/docs/latest/operate/rs/security/access-control/ldap/enable-role-based-ldap).
+    >     
+
+    ![Enable LDAP mappings Panel](https://redis.io/docs/latest/images/rs/access-control-ldap-mappings-panel.png)
+
+1.  Select the **+ Add LDAP Mapping** button to create a new mapping and then enter the following details:
+
+    | _Setting_ | _Description_ | 
+|:----------|:--------------|
+| **Name** | A descriptive, unique name for the mapping |
+| **Distinguished Name** | The distinguished name of the LDAP group to be mapped.  <br/>Example: `cn=admins,ou=groups,dc=example,dc=com` |
+| **Role** | The Redis Software access control role defined for this group |
+| **Email** | _(Optional)_ An address to receive alerts|
+| **Alerts**  | Selections identifying the desired alerts. |
+
+    ![Create LDAP mapping dialog](https://redis.io/docs/latest/images/rs/screenshots/access-control/7-22-updates/ldap-mappings-add.png)
+
+1.  When finished, select the **Save** button.
+
+Create a mapping for each LDAP group used to authenticate and/or authorize access to Redis Software resources.
+
+The scope of the authorization depends on the access control role:
+
+- If the role authorizes admin management, LDAP users are authorized as cluster management administrators.
+
+- If the role authorizes database access, LDAP users are authorized to use the database to the limits specified in the role.
+
+- To authorize LDAP users to specific databases, update the database access control lists (ACLs) to include the mapped LDAP role.
+
+## More info
+
+- Enable and configure [role-based LDAP](https://redis.io/docs/latest/operate/rs/security/access-control/ldap/enable-role-based-ldap)
+- Update database ACLs to [authorize LDAP access](https://redis.io/docs/latest/operate/rs/security/access-control/ldap/update-database-acls)
+- Learn more about Redis Software [security and practices](https://redis.io/docs/latest/operate/rs/security)
+
