@@ -39,9 +39,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      cache_from:
-        - type=registry
-        - type=local
     image: system-design-backend:latest
     container_name: system_design_backend
     restart: unless-stopped
@@ -64,14 +61,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      cache_from:
-        - type=registry
-        - type=local
     image: system-design-frontend:latest
     container_name: system_design_frontend
     restart: unless-stopped
     ports:
       - "3000:80"
+
     depends_on:
       - backend
     networks:

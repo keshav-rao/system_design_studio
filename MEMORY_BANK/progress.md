@@ -40,14 +40,50 @@
     - Admin Component Modal for registering new architectural building blocks.
   - 19 automated tests passing in test suite (unit + API integration tests), 0 ruff lint errors, 0 mypy type errors.
 
+- **Phase 3 Deterministic Validator**:
+  - Implemented 12 pure-function validation rules (one file per rule under `backend/app/services/validator/rules/`):
+    1. `valid_edge_refs.py`: ensures all edges reference existing node IDs.
+    2. `no_self_loops.py`: detects invalid edges from a node to itself.
+    3. `no_duplicate_edges.py`: flags duplicate directional edges between node pairs.
+    4. `no_dangling_nodes.py`: flags disconnected or isolated nodes in multi-node designs.
+    5. `no_spof.py`: detects single points of failure (databases, caches, queues with only 1 replica and no redundant siblings).
+    6. `no_edge_to_db.py`: prevents edge/CDN components from connecting directly to databases or caches.
+    7. `gateway_required.py`: ensures multi-service application layer has a reverse proxy or API gateway.
+    8. `cache_before_db.py`: flags database queries under high traffic (>= 1,000 QPS or >= 50,000 concurrent users) without an in-memory caching layer.
+    9. `async_processing.py`: requires async message queue/streaming buffer when write throughput is elevated (>= 2,000 QPS).
+    10. `data_store_required.py`: verifies at least one durable datastore (database, object store) is present when durability is required.
+    11. `multi_region.py`: verifies deployment replication factor meets multi-region requirements.
+    12. `throughput_bottleneck.py`: inspects max throughput limits between upstream/downstream nodes and flags severe capacity mismatches (> 5x ratio).
+  - Built `ValidatorService` with dynamic rule registry, execution timing (<10ms runtime, well under 1s requirement), and result aggregation.
+  - Defined Pydantic v2 schemas (`DesignDocument`, `DesignNode`, `DesignEdge`, `DesignRequirements`, `ValidationIssue`, `ValidationResult`, `Severity`).
+  - Added REST API endpoints under `/api/v1/validator`: `POST /validate` and `GET /rules`.
+  - Comprehensive test suite: 46 tests in `tests/test_validator.py` with passing and failing cases for every single rule, performance verification, and API integration.
+  - Clean linting (Ruff) and full static type safety (Mypy with `pydantic.mypy` across 49 backend files). Total test suite: 65 tests passing.
+
+- **Phase 4 Planner (LangGraph & DeepSeek-R1-Distill-Qwen-32B)**:
+  - Built configurable LLM Adapter interface (`BaseLLMAdapter`) supporting `DeepSeek-R1-Distill-Qwen-32B` via Ollama and vLLM (with chain-of-thought `<think>` stripping) and a deterministic `MockLLMAdapter` for unit testing and offline development.
+  - Provided PowerShell sync script (`scripts/sync_model_bucket.ps1`) for downloading the model weights from the Hugging Face bucket `keshavrao887/DeepSeek-R1-Distill-Qwen-32B-bucket`.
+  - Implemented `InterviewService` providing fixed sizing/NFR questioning (QPS, concurrent users, SLA, durability, regions) plus adaptive domain follow-ups (e.g. Tinder real-time geospatial matching).
+  - Orchestrated full generation lifecycle using **LangGraph** (`ArchitecturePlannerGraph`):
+    1. Hybrid RAG retrieval from Qdrant knowledge base for evidence grounding.
+    2. Catalog limits and protocol grounding from component catalog.
+    3. ArchitectureProposal synthesis with DeepSeek-R1.
+    4. Pydantic v2 parsing with automatic reflection and self-correction retry loop (up to 2 retries on schema invalidity).
+    5. Pure-rule deterministic validation execution.
+  - Created SQLAlchemy models (`Project`, `DesignVersion`) and applied Alembic async migration `003_phase4_projects_and_designs.py`.
+  - Exposed REST API endpoints under `/api/v1/projects`: `POST /`, `GET /`, `GET /{id}`, `POST /interview`, `POST /{id}/plan`, `GET /{id}/designs`, `GET /{id}/designs/latest`.
+  - Verified Phase 4 definition of done: Tinder-like dating app example generates schema-valid proposal grounded in catalog facts (`redis-cache`, `postgresql`, `fastapi`, `kong-gateway`, `rabbitmq`), includes RAG evidence citations and alternative tradeoffs, passes deterministic validation (`is_valid=True`), and persists as an immutable snapshot.
+  - All 73 tests passing in full test suite (0 ruff lint errors, 0 mypy type errors across 60 files).
+
 ## In Progress
-- Ready for Phase 3: Deterministic validator.
+- Ready for Phase 5: Frontend canvas (React Flow canvas, Component / Validation / Evidence / Cost tabs).
 
 ## Upcoming
-- **Phase 3**: Deterministic validator (pure rule functions, passing/failing tests, project validation endpoint).
-- **Phase 4**: Planner (LLM adapter, requirements interview, architecture proposals).
-- **Phase 5**: Frontend infinite canvas (React Flow, swappable components, inspection panels).
-- **Phase 6**: Load simulation & tier cost analysis (1, 100, 1k, 100k users, Excel/table cost breakdown).
+- **Phase 5**: Frontend canvas (Vite + React + TypeScript + React Flow canvas, swappable components, inspection tabs).
+- **Phase 6**: Iterative redesign (detect nodes affected by requirement/component changes, partial re-plan).
+- **Phase 7**: Evaluation and hardening (100+ eval questions, 15+ gold designs, benchmarking).
 
 ## Known Issues
 - None.
+
+

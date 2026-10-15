@@ -1,9 +1,11 @@
 # Active Context
 
-Current phase: Phase 2 — Structured Component Catalog (Completed)
-Current task: Phase 2 verification complete
-Last completed: Curated and created comprehensive raw materials knowledge base in `/rag_knowledge_base` with 28 structured documents across 7 categories (01_fundamentals, 02_cloud_frameworks, 03_component_decision_guides, 04_reference_architectures, 05_performance_and_load_testing, 06_cost_and_capacity_models, 07_architecture_decision_records), complete with chunk metadata headers, machine-readable `corpus_manifest.json`, and explicit answers to core architectural decisions (Tinder with Redis, Kafka vs RabbitMQ, SQL vs NoSQL, L4 vs L7, benchmark k6/Locust, cost models).
-In progress: Ready for Phase 3 (Deterministic Validator) or RAG corpus ingestion
-Next up: Phase 3 — Validator (Pure rule functions per file, passing and failing tests for each rule, project validation endpoint)
+Current phase: Phase 4 — Planner (Completed)
+Current task: Phase 4 verified & tested
+Last completed: Implemented LangGraph-driven architecture planner with DeepSeek-R1-Distill-Qwen-32B support (via Ollama / vLLM with resilient Mock adapter for offline testing), Hugging Face bucket sync script (`scripts/sync_model_bucket.ps1`), Requirements Interview Service with fixed + adaptive questioning, ArchitectureProposal Pydantic schema with automatic self-reflection retry loop on invalid JSON, full deterministic validation integration, and PostgreSQL/SQLite persistence for projects and design version snapshots (`POST /projects`, `/interview`, `/{id}/plan`, `/{id}/designs`). 73 tests passing in full test suite (0 ruff errors, 0 mypy issues across 60 files).
+In progress: Ready for Phase 5 — Frontend Infinite Canvas (React Flow, swappable components, inspection panels)
+Next up: Phase 5 — Frontend canvas (week 5–7): Vite + React + TypeScript + React Flow canvas, Component / Validation / Evidence / Cost tabs, OpenAPI-backed API client.
 Open questions: None
 Blockers: None
+
+

@@ -58,6 +58,16 @@ class Settings(BaseSettings):
     # Data paths
     DATA_DIR: str = "./data"
 
+    # LLM Settings (DeepSeek-R1-Distill-Qwen-32B)
+    LLM_PROVIDER: str = "ollama"  # "ollama", "vllm", or "mock"
+    LLM_MODEL: str = "deepseek-r1:32b"
+    LLM_BASE_URL: str = "http://localhost:11434"
+    LLM_API_KEY: str | None = None
+    LLM_TEMPERATURE: float = 0.2
+    LLM_MAX_RETRIES: int = 2
+    LLM_HF_BUCKET: str = "keshavrao887/DeepSeek-R1-Distill-Qwen-32B-bucket"
+    LLM_LOCAL_MODEL_PATH: str = "./models/DeepSeek-R1-Distill-Qwen-32B"
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

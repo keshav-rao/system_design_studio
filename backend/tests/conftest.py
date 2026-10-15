@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.models.catalog import Component, ComponentCompatibility  # noqa: F401
+from app.models.project import DesignVersion, Project  # noqa: F401
 from app.models.source import EvalQuestion, EvalRun, Source  # noqa: F401
 from app.services.knowledge.providers.hybrid_embedder import HybridEmbedder
 from app.services.knowledge.providers.qdrant_store import QdrantVectorStore

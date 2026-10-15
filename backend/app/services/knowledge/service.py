@@ -202,7 +202,7 @@ class KnowledgeService:
 
                 req = KnowledgeIngestRequest(
                     title=title,
-                    collection=collection_dir,  # type: ignore[arg-type]
+                    collection=collection_dir,
                     content=content,
                     licence=licence,
                     publication_date=pub_date,
