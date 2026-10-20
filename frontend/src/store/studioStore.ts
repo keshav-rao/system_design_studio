@@ -9,15 +9,19 @@ import type {
   DesignDiff,
 } from '../types/api'
 import type { ComponentItem } from '../types/catalog'
+import { ARCH_TEMPLATES, DEFAULT_TEMPLATE } from '../data/archTemplates'
 
 // ── View Enum ────────────────────────────────────────────────────────────────
 
 export type AppView =
-  | 'projects'        // Projects list / landing
+  | 'overview'        // Overview / landing dashboard
+  | 'canvas'          // Canva template / Architecture canvas
+  | 'compatibility'   // Connection compatibility engine
+  | 'catalog'         // Component catalog explorer
+  | 'projects'        // Projects list / manager
   | 'interview'       // Requirements interview wizard
   | 'requirements'    // Review gathered requirements
   | 'generating'      // Spinning while plan is generated
-  | 'canvas'          // Main design canvas + tabs
 
 export type CanvasTab = 'component' | 'validation' | 'evidence' | 'cost'
 
@@ -53,11 +57,13 @@ interface StudioState {
   activeCanvasTab: CanvasTab
   selectedNodeId: string | null
   sidebarOpen: boolean
+  activeTemplateId: string | null
 
   // Actions
   setCatalog: (items: ComponentItem[]) => void
   setProjects: (projects: ProjectResponse[]) => void
   selectProject: (project: ProjectResponse) => void
+  loadTemplate: (templateId?: string) => void
 
   setAppDescription: (desc: string) => void
   setInterviewState: (q: InterviewQuestion[], a: InterviewAnswer[], completed: boolean) => void
@@ -103,13 +109,14 @@ export const useStudioStore = create<StudioState>()((set) => ({
   generating: false,
   generateError: null,
 
-  canvasNodes: [],
-  canvasEdges: [],
+  canvasNodes: DEFAULT_TEMPLATE.nodes,
+  canvasEdges: DEFAULT_TEMPLATE.edges,
 
-  view: 'projects',
+  view: 'overview',
   activeCanvasTab: 'component',
   selectedNodeId: null,
   sidebarOpen: true,
+  activeTemplateId: DEFAULT_TEMPLATE.id,
 
   // Catalog
   setCatalog: (items) => set({ catalog: items, catalogLoaded: true }),
@@ -123,6 +130,17 @@ export const useStudioStore = create<StudioState>()((set) => ({
     canvasNodes: [],
     canvasEdges: [],
   }),
+  loadTemplate: (templateId) => {
+    const tmpl = (templateId && ARCH_TEMPLATES[templateId]) ? ARCH_TEMPLATES[templateId] : DEFAULT_TEMPLATE
+    set({
+      canvasNodes: [...tmpl.nodes],
+      canvasEdges: [...tmpl.edges],
+      activeTemplateId: tmpl.id,
+      activeDesign: null,
+      selectedNodeId: null,
+      view: 'canvas',
+    })
+  },
 
   // Interview
   setAppDescription: (desc) => set({ appDescription: desc }),

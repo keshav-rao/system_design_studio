@@ -29,7 +29,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  LayoutDashboard,
+  ChevronDown,
 } from 'lucide-react'
+import { ARCH_TEMPLATES } from '../../data/archTemplates'
 
 // ── Category colors ──────────────────────────────────────────────────────────
 
@@ -297,6 +300,8 @@ export default function ArchCanvas() {
     setSelectedNode,
     selectedNodeId,
     catalog,
+    loadTemplate,
+    activeTemplateId,
   } = useStudioStore()
 
   // Expose catalog on window for designNodesToFlow helper
@@ -310,6 +315,7 @@ export default function ArchCanvas() {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(initNodes)
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(initEdges)
   const [showAddDrawer, setShowAddDrawer] = useState(false)
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false)
 
   // Sync store → ReactFlow when canvasNodes/edges change
   useEffect(() => {
@@ -408,7 +414,51 @@ export default function ArchCanvas() {
           position="bottom-right"
         />
 
-        <Panel position="top-right" className="flex gap-2">
+        <Panel position="top-right" className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowTemplateMenu((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#111726]/90 hover:bg-[#1a233b] text-slate-200 text-xs font-medium rounded-xl transition-all border border-slate-700/80 shadow-lg backdrop-blur-md"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
+              Templates
+              <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+            </button>
+            {showTemplateMenu && (
+              <div className="absolute right-0 mt-2 w-72 bg-[#111726] border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-30 divide-y divide-slate-800/60">
+                <div className="px-3 py-1.5">
+                  <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Canva Templates</p>
+                </div>
+                <div className="py-1 space-y-1">
+                  {Object.values(ARCH_TEMPLATES).map((tmpl) => (
+                    <button
+                      key={tmpl.id}
+                      onClick={() => {
+                        loadTemplate(tmpl.id)
+                        setShowTemplateMenu(false)
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex flex-col gap-1 ${
+                        activeTemplateId === tmpl.id
+                          ? 'bg-indigo-600/20 text-white border border-indigo-500/40'
+                          : 'text-slate-300 hover:bg-slate-800/80 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-white">{tmpl.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono font-medium">
+                          {tmpl.badge}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 leading-relaxed line-clamp-2">
+                        {tmpl.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setShowAddDrawer(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 border border-indigo-500/50"
