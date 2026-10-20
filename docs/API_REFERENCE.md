@@ -118,10 +118,13 @@
 - `POST /api/v1/catalog/seed`
   - Seeds or resets 40+ standard architectural components and 30+ compatibility rules idempotently.
 
-### Planned Endpoints (Phases 3-6)
+### Projects & Planner (Phases 4-6)
 - `POST /projects`: Create a new architecture project.
-- `POST /projects/{id}/interview`: Interactive requirement questioning.
-- `POST /projects/{id}/plan`: Generate proposal with planner.
-- `POST /projects/{id}/validate`: Run deterministic validation rules.
-- `PATCH /projects/{id}/design`: Update nodes/edges from canvas edits.
-
+- `GET /api/v1/projects`: List architecture projects.
+- `POST /api/v1/projects/interview`: Interactive requirement questioning.
+- `POST /api/v1/projects/{id}/plan`: Generate and persist a complete design version.
+- `POST /api/v1/projects/{id}/redesign`: Re-plan only affected nodes and their local connections, merge with unchanged parts, validate, and persist a new design version.
+  - Body includes `change_description`, the full updated `requirements`, and optional `affected_node_ids`. If no node is selected, changed requirement fields and change-description terms are used to infer affected components.
+  - Returns the new version. Compare it with the previous version to inspect added, removed, or updated components and connections.
+- `GET /api/v1/projects/{id}/designs`: List version history.
+- `GET /api/v1/projects/{id}/designs/latest`: Get the current version.

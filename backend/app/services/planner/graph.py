@@ -29,6 +29,7 @@ class PlannerState(TypedDict, total=False):
     """Execution state passed through the LangGraph pipeline."""
 
     app_description: str
+    planning_context: str
     requirements: dict[str, Any]
     retrieved_evidence: list[dict[str, Any]]
     catalog_context: list[str]
@@ -148,6 +149,7 @@ class ArchitecturePlannerGraph:
         evidence = state.get("retrieved_evidence", [])
         catalog = state.get("catalog_context", [])
         error_msg = state.get("error_message")
+        planning_context = state.get("planning_context")
 
         system_prompt = (
             "You are a Principal Cloud Architect using System Design Studio. "
@@ -159,8 +161,10 @@ class ArchitecturePlannerGraph:
         prompt_lines = [
             f"Design an architecture for the following system: {app_desc}",
             f"Non-Functional Requirements: {json.dumps(reqs)}",
-            "Grounding Evidence from Knowledge Base:",
         ]
+        if planning_context:
+            prompt_lines.extend(["", planning_context])
+        prompt_lines.append("Grounding Evidence from Knowledge Base:")
         for ev in evidence:
             prompt_lines.append(f"- [{ev.get('source_title')}]: {ev.get('snippet')}")
 
@@ -250,6 +254,7 @@ class ArchitecturePlannerGraph:
         app_description: str,
         requirements: DesignRequirements | None = None,
         max_retries: int = 2,
+        planning_context: str | None = None,
     ) -> PlannerState:
         """Run the full LangGraph planning pipeline."""
         reqs_dict = (
@@ -260,6 +265,7 @@ class ArchitecturePlannerGraph:
 
         initial_state: PlannerState = {
             "app_description": app_description,
+            "planning_context": planning_context or "",
             "requirements": reqs_dict,
             "retrieved_evidence": [],
             "catalog_context": [],

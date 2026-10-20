@@ -75,15 +75,38 @@
   - Verified Phase 4 definition of done: Tinder-like dating app example generates schema-valid proposal grounded in catalog facts (`redis-cache`, `postgresql`, `fastapi`, `kong-gateway`, `rabbitmq`), includes RAG evidence citations and alternative tradeoffs, passes deterministic validation (`is_valid=True`), and persists as an immutable snapshot.
   - All 73 tests passing in full test suite (0 ruff lint errors, 0 mypy type errors across 60 files).
 
+- **Phase 5 Frontend Canvas**:
+  - Built full studio shell (`App.tsx`) routing between 5 views: projects, interview, requirements, generating, canvas.
+  - Created `src/store/studioStore.ts` — Zustand store with full state: catalog, projects, interview answers, design versions, canvas nodes/edges, UI selections.
+  - Created `src/api/client.ts` — typed API client wrapping all backend endpoints.
+  - Created `src/types/api.ts` — TypeScript types mirroring all backend Pydantic schemas.
+  - **ProjectsPanel**: hero landing page with project creation form, existing project list (routes to canvas for existing designs, interview for new ones).
+  - **InterviewPanel**: multi-step wizard with describe step → per-question cards (multiple-choice or free-text), category icons, progress bar, back/skip navigation.
+  - **RequirementsReview**: inferred NFR summary table, expandable raw answers, generate CTA with error handling for offline LLM.
+  - **GeneratingScreen**: animated orb + step-by-step LangGraph pipeline progress indicator.
+  - **ArchCanvas** (React Flow): custom colored arch nodes per component category, animated edges, add-component drawer with compatibility pre-check, minimap, layer guide panel, bidirectional Zustand sync.
+  - **ComponentTab**: selected node inspector with limits, protocols, connections, failure modes, replica control, replace-component modal.
+  - **ValidationTab**: grouped issues by severity with rule badges, clickable node links, rules-executed accordion.
+  - **EvidenceTab**: RAG citation cards with relevance score bars, alternatives considered comparison, assumptions list.
+  - **CostTab**: per-component monthly cost breakdown with percentage bars, high-cost warnings, total estimate.
+  - **StudioLayout**: canvas toolbar (breadcrumb, validation status, redesign CTA), collapsible right sidebar with 4 tabs.
+  - Zero TypeScript errors (`tsc --noEmit` exits 0), dev server starts in ~1.7s.
+  - Done when users can go from idea → interview → validated diagram in the UI. ✅
+
+## Phase 6: Iterative Redesign
+- Added `POST /api/v1/projects/{id}/redesign` to infer affected components from changed NFRs or component-change language, with explicit node selection as an override.
+- Re-retrieves evidence for a focused redesign request, passes the existing affected subgraph and boundaries into the planner, and merges the result while preserving untouched nodes and edges.
+- Validates the merged design and persists it as a new immutable version.
+- Added a canvas redesign dialog for change description, NFR edits, and optional node selection, plus a version diff for nodes, connections, and requirements.
+- Added service and API regression coverage proving unrelated components are preserved.
+- Validation: all 74 backend tests pass; focused redesign API test passes; Ruff and Mypy pass; frontend production build and TypeScript checks pass.
+
 ## In Progress
-- Ready for Phase 5: Frontend canvas (React Flow canvas, Component / Validation / Evidence / Cost tabs).
+- Phase 6 complete.
 
 ## Upcoming
-- **Phase 5**: Frontend canvas (Vite + React + TypeScript + React Flow canvas, swappable components, inspection tabs).
-- **Phase 6**: Iterative redesign (detect nodes affected by requirement/component changes, partial re-plan).
-- **Phase 7**: Evaluation and hardening (100+ eval questions, 15+ gold designs, benchmarking).
+- **Phase 7**: Evaluation and hardening.
 
 ## Known Issues
 - None.
-
 

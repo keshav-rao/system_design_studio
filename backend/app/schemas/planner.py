@@ -194,6 +194,21 @@ class PlanRequest(BaseModel):
     )
 
 
+class RedesignRequest(BaseModel):
+    """Request to re-plan an affected part of the latest design."""
+
+    change_description: str = Field(
+        ..., min_length=5, description="Requirement or component change to apply"
+    )
+    requirements: DesignRequirements | None = Field(
+        default=None, description="Updated non-functional requirements"
+    )
+    affected_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Nodes explicitly affected by this change",
+    )
+
+
 class DesignVersionResponse(BaseModel):
     """A full design proposal version."""
 
@@ -211,3 +226,7 @@ class DesignVersionResponse(BaseModel):
     validation_issues: list[ValidationIssue]
     is_valid: bool
     created_at: datetime
+    affected_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Nodes re-planned for this response, when created by redesign",
+    )

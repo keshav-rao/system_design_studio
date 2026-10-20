@@ -13,6 +13,7 @@ from app.schemas.planner import (
     PlanRequest,
     ProjectCreate,
     ProjectResponse,
+    RedesignRequest,
 )
 from app.services.catalog.catalog_service import catalog_service
 from app.services.knowledge.service import KnowledgeService, get_knowledge_service
@@ -173,6 +174,54 @@ async def generate_plan(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Planning generation failed: {e}",
         ) from e
+
+
+@router.post(
+    "/{project_id}/redesign",
+    response_model=DesignVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Re-plan an affected design subgraph and create a new version",
+)
+async def redesign(
+    project_id: uuid.UUID,
+    req: RedesignRequest,
+    db: AsyncSession = Depends(get_db),
+    planner_service: PlannerService = Depends(get_planner_service),
+) -> DesignVersionResponse:
+    try:
+        version, affected_node_ids = await planner_service.redesign(
+            project_id, req, db
+        )
+    except LookupError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Architecture redesign failed: {e}",
+        ) from e
+    return DesignVersionResponse(
+        id=version.id,
+        project_id=version.project_id,
+        version_number=version.version_number,
+        title=version.title,
+        summary=version.summary,
+        requirements=version.requirements,
+        nodes=version.nodes,
+        edges=version.edges,
+        assumptions=version.assumptions,
+        evidence_links=version.evidence_links,
+        alternatives_considered=version.alternatives_considered,
+        validation_issues=version.validation_issues,
+        is_valid=version.is_valid,
+        created_at=version.created_at,
+        affected_node_ids=affected_node_ids,
+    )
 
 
 

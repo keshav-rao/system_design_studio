@@ -1,5 +1,6 @@
 """Planner Service coordinating the LangGraph workflow, DB persistence, and projects."""
 
+import json
 import logging
 import uuid
 from typing import Any
@@ -14,7 +15,9 @@ from app.schemas.planner import (
     InterviewResponse,
     PlanRequest,
     ProjectCreate,
+    RedesignRequest,
 )
+from app.schemas.validator import DesignDocument, DesignNode, DesignRequirements
 from app.services.catalog.catalog_service import CatalogService
 from app.services.knowledge.service import KnowledgeService
 from app.services.planner.graph import ArchitecturePlannerGraph
@@ -168,6 +171,236 @@ class PlannerService:
         await db.commit()
         await db.refresh(design_version)
         return design_version
+
+    async def redesign(
+        self,
+        project_id: uuid.UUID,
+        req: RedesignRequest,
+        db: AsyncSession,
+    ) -> tuple[DesignVersion, list[str]]:
+        """Re-plan an affected subgraph and persist it as a new version."""
+        previous = await self.get_latest_design_version(project_id, db)
+        if previous is None:
+            raise LookupError(f"No design versions found for project '{project_id}'.")
+
+        old_requirements = DesignRequirements.model_validate(previous.requirements)
+        old_requirement_values = old_requirements.model_dump()
+        new_requirements = req.requirements or old_requirements
+        changed_requirements = {
+            key
+            for key, value in new_requirements.model_dump().items()
+            if value != old_requirement_values.get(key)
+        }
+        old_nodes = [DesignNode.model_validate(node) for node in previous.nodes]
+        nodes_by_id = {node.id: node for node in old_nodes}
+        unknown_ids = set(req.affected_node_ids) - nodes_by_id.keys()
+        if unknown_ids:
+            raise ValueError(
+                f"Unknown affected node IDs: {', '.join(sorted(unknown_ids))}"
+            )
+
+        seeds = set(req.affected_node_ids)
+        seeds.update(
+            self._nodes_affected_by_change(
+                old_nodes, changed_requirements, req.change_description
+            )
+        )
+        if not seeds:
+            raise ValueError(
+                "Could not determine affected components. Select one or more nodes "
+                "or describe a supported requirement/component change."
+            )
+
+        scope_ids = set(seeds)
+        for edge in previous.edges:
+            if edge["source_id"] in seeds:
+                scope_ids.add(edge["target_id"])
+            if edge["target_id"] in seeds:
+                scope_ids.add(edge["source_id"])
+        scoped_nodes = [node.model_dump() for node in old_nodes if node.id in scope_ids]
+        context = (
+            "ITERATIVE REDESIGN: Re-plan only the affected subgraph. "
+            "Keep these existing node IDs stable for all retained components and "
+            "do not redesign components outside the supplied scope. Return only "
+            "the changed subgraph in nodes/edges; include the stable IDs of every "
+            "affected node. Preserve connections to unchanged boundary nodes.\n"
+            f"Change requested: {req.change_description}\n"
+            f"Affected node IDs: {sorted(seeds)}\n"
+            f"Subgraph context (includes neighboring boundary nodes): "
+            f"{json.dumps(scoped_nodes)}\n"
+            f"Existing design summary: {previous.summary}"
+        )
+        state = await self.graph.plan(
+            app_description=(
+                f"{previous.title}. Focused redesign request: {req.change_description}"
+            ),
+            requirements=new_requirements,
+            planning_context=context,
+        )
+        proposal_data: dict[str, Any] = state.get("proposal") or {}
+        if not proposal_data:
+            raise RuntimeError(
+                f"Architecture redesign failed: {state.get('error_message')}"
+            )
+
+        proposed_nodes = [
+            DesignNode.model_validate(node) for node in proposal_data.get("nodes", [])
+        ]
+        proposed_edges = proposal_data.get("edges", [])
+        proposed_ids = {node.id for node in proposed_nodes}
+        if not seeds.issubset(proposed_ids):
+            missing_ids = sorted(seeds - proposed_ids)
+            raise RuntimeError(
+                "Planner did not preserve affected node IDs: "
+                + ", ".join(missing_ids)
+            )
+
+        merged_node_ids = set(nodes_by_id) | {
+            node.id
+            for node in proposed_nodes
+            if node.id in seeds
+            or (
+                node.id not in nodes_by_id
+                and any(
+                    (
+                        edge["source_id"] == node.id
+                        and edge["target_id"] in seeds
+                    )
+                    or (
+                        edge["target_id"] == node.id
+                        and edge["source_id"] in seeds
+                    )
+                    for edge in proposed_edges
+                )
+            )
+        }
+        new_nodes = [
+            node
+            for node in proposed_nodes
+            if (
+                node.id in merged_node_ids and node.id not in nodes_by_id
+            )
+            or node.id in seeds
+        ]
+        merged_nodes = [
+            node.model_dump() for node in old_nodes if node.id not in seeds
+        ] + [node.model_dump() for node in new_nodes]
+        retained_edges = [
+            edge
+            for edge in previous.edges
+            if edge["source_id"] not in seeds and edge["target_id"] not in seeds
+        ]
+        new_edges = [
+            edge
+            for edge in proposed_edges
+            if edge["source_id"] in merged_node_ids
+            and edge["target_id"] in merged_node_ids
+            and (edge["source_id"] in seeds or edge["target_id"] in seeds)
+        ]
+        merged_edges = self._unique_edges(retained_edges + new_edges)
+        validation = self.validator.validate(
+            DesignDocument(
+                nodes=merged_nodes,
+                edges=merged_edges,
+                requirements=new_requirements,
+            )
+        )
+
+        design_version = DesignVersion(
+            id=uuid.uuid4(),
+            project_id=project_id,
+            version_number=previous.version_number + 1,
+            title=previous.title,
+            summary=(
+                f"{previous.summary}\n\n"
+                f"Redesign v{previous.version_number + 1}: "
+                f"{proposal_data.get('summary', previous.summary)}"
+            ),
+            requirements=new_requirements.model_dump(),
+            nodes=merged_nodes,
+            edges=merged_edges,
+            assumptions=list(
+                dict.fromkeys(
+                    previous.assumptions + proposal_data.get("assumptions", [])
+                )
+            ),
+            evidence_links=self._merge_records(
+                previous.evidence_links, proposal_data.get("evidence_links", [])
+            ),
+            alternatives_considered=self._merge_records(
+                previous.alternatives_considered,
+                proposal_data.get("alternatives_considered", []),
+            ),
+            validation_issues=[issue.model_dump() for issue in validation.issues],
+            is_valid=validation.valid,
+        )
+        db.add(design_version)
+        await db.commit()
+        await db.refresh(design_version)
+        return design_version, sorted(seeds)
+
+    @staticmethod
+    def _nodes_affected_by_change(
+        nodes: list[DesignNode],
+        changed_requirements: set[str],
+        description: str,
+    ) -> set[str]:
+        """Map changed NFRs and common component terms to relevant catalog nodes."""
+        category_groups: list[set[str]] = []
+        if changed_requirements.intersection({"expected_users", "expected_qps"}):
+            category_groups.append(
+                {"compute", "cache", "database", "queue", "streaming", "gateway"}
+            )
+        if "availability_target" in changed_requirements:
+            category_groups.append(
+                {"compute", "cache", "database", "queue", "streaming", "gateway"}
+            )
+        if "data_durability_required" in changed_requirements:
+            category_groups.append({"database", "storage"})
+        if "regions" in changed_requirements:
+            category_groups.append({node.category for node in nodes})
+
+        terms_by_category = {
+            "database": {"database", "db", "postgres", "postgresql", "sql", "mongo"},
+            "storage": {"storage", "object", "s3", "durability"},
+            "cache": {"cache", "redis"},
+            "queue": {"queue", "rabbitmq", "async", "broker"},
+            "streaming": {"stream", "kafka", "event"},
+            "compute": {"compute", "service", "application", "api", "users", "traffic"},
+            "gateway": {"gateway", "proxy", "ingress"},
+        }
+        words = set(description.lower().replace("-", " ").replace("_", " ").split())
+        inferred_categories = {
+            category
+            for category, terms in terms_by_category.items()
+            if words.intersection(terms)
+        }
+        if words.intersection({"region", "regions", "global", "geography"}):
+            inferred_categories.update(node.category for node in nodes)
+        category_groups.extend([{category} for category in inferred_categories])
+        return {
+            node.id
+            for node in nodes
+            if any(node.category in categories for categories in category_groups)
+        }
+
+    @staticmethod
+    def _unique_edges(edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        unique: dict[tuple[str, str, str | None], dict[str, Any]] = {}
+        for edge in edges:
+            key = (edge["source_id"], edge["target_id"], edge.get("protocol"))
+            unique[key] = edge
+        return list(unique.values())
+
+    @staticmethod
+    def _merge_records(
+        existing: list[dict[str, Any]], updated: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        merged: dict[str, dict[str, Any]] = {}
+        for record in existing + updated:
+            key = str(record.get("source_id") or record.get("component_slug") or record)
+            merged[key] = record
+        return list(merged.values())
 
     async def list_design_versions(
         self, project_id: uuid.UUID, db: AsyncSession

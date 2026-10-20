@@ -47,7 +47,10 @@ Build in vertical slices. Finish and test each phase before starting the next.
 ## Phase 6: Iterative redesign (week 7–8)
 - Detect nodes affected by a requirement or component change.
 - Re-retrieve and re-plan only that subgraph; show a version diff.
-- Done when changing the database or user count updates only relevant parts.
+- Added a versioned redesign endpoint that infers affected nodes from changed requirements or accepts explicit node IDs, then grounds planning in the existing subgraph and its boundaries.
+- Merge the generated subgraph with untouched nodes and edges, validate the complete result, and persist a new immutable design version.
+- The canvas supports focused redesign, NFR edits, and a before/after node, connection, and requirement diff.
+- Done when changing the database or user count updates only relevant parts. ✅
 
 ## Phase 7: Evaluation and hardening (week 8–9)
 - Build an eval set of 100+ questions and 15+ gold designs with a runner.

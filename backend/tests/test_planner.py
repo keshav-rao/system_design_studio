@@ -22,8 +22,9 @@ from app.schemas.planner import (
     InterviewRequest,
     PlanRequest,
     ProjectCreate,
+    RedesignRequest,
 )
-from app.schemas.validator import DesignRequirements
+from app.schemas.validator import DesignNode, DesignRequirements
 from app.services.planner.graph import ArchitecturePlannerGraph
 from app.services.planner.interview_service import InterviewService
 from app.services.planner.planner_service import PlannerService
@@ -221,6 +222,96 @@ class TestPlannerServiceAndPersistence:
         assert len(versions_after) == 2
         assert versions_after[0].version_number == 2
 
+    @pytest.mark.asyncio
+    async def test_redesign_updates_only_affected_subgraph(
+        self, test_db: AsyncSession
+    ) -> None:
+        service = PlannerService(llm_adapter=MockLLMAdapter())
+        project = await service.create_project(
+            ProjectCreate(name="Subgraph redesign"), db=test_db
+        )
+        requirements = DesignRequirements(
+            expected_users=100000,
+            expected_qps=5000,
+            availability_target=99.95,
+            data_durability_required=True,
+            regions=1,
+        )
+        first_version = await service.generate_plan(
+            project.id,
+            PlanRequest(
+                app_description="Tinder dating app with geospatial matching",
+                requirements=requirements,
+            ),
+            db=test_db,
+        )
+        original_nodes = {node["id"]: node for node in first_version.nodes}
+        inferred_scope = service._nodes_affected_by_change(
+            [DesignNode.model_validate(node) for node in first_version.nodes],
+            {"expected_users"},
+            "Increase user count",
+        )
+        assert {
+            "app_match",
+            "cache_geo",
+            "db_primary",
+            "queue_swipes",
+        } <= inferred_scope
+        assert "edge_cdn" not in inferred_scope
+        original_database = original_nodes["db_primary"]
+        planner_contexts: list[str] = []
+
+        async def plan_subgraph(
+            app_description: str,
+            requirements: DesignRequirements,
+            planning_context: str,
+        ) -> dict:
+            planner_contexts.append(planning_context)
+            updated_database = {**original_database, "replicas": 3}
+            return {
+                "proposal": {
+                    "summary": "Updated database subgraph",
+                    "nodes": [updated_database],
+                    "edges": [
+                        {
+                            "source_id": "app_match",
+                            "target_id": "db_primary",
+                            "protocol": "SQL",
+                            "label": "Updated database connection",
+                        }
+                    ],
+                    "assumptions": [],
+                    "evidence_links": [],
+                    "alternatives_considered": [],
+                }
+            }
+
+        service.graph.plan = plan_subgraph  # type: ignore[method-assign]
+        next_version, affected_ids = await service.redesign(
+            project.id,
+            RedesignRequest(
+                change_description="Increase primary database capacity",
+                requirements=requirements,
+                affected_node_ids=["db_primary"],
+            ),
+            db=test_db,
+        )
+
+        updated_nodes = {node["id"]: node for node in next_version.nodes}
+        assert next_version.version_number == first_version.version_number + 1
+        assert affected_ids == ["db_primary"]
+        assert updated_nodes["db_primary"]["replicas"] == 3
+        assert {
+            node_id: node for node_id, node in updated_nodes.items()
+            if node_id != "db_primary"
+        } == {
+            node_id: node for node_id, node in original_nodes.items()
+            if node_id != "db_primary"
+        }
+        assert "ITERATIVE REDESIGN" in planner_contexts[0]
+        assert "edge_cdn" not in planner_contexts[0]
+        assert "db_primary" in planner_contexts[0]
+
 
 # =========================================================================
 # API Integration Tests
@@ -283,3 +374,32 @@ async def test_project_and_planner_api(async_client: AsyncClient) -> None:
     )
     assert latest_resp.status_code == 200
     assert latest_resp.json()["id"] == version_data["id"]
+
+    # 6. Re-plan a focused database subgraph as an immutable new version
+    redesign_resp = await async_client.post(
+        f"/api/v1/projects/{project_id}/redesign",
+        json={
+            "change_description": "Increase primary database capacity",
+            "requirements": version_data["requirements"],
+            "affected_node_ids": ["db_primary"],
+        },
+    )
+    assert redesign_resp.status_code == 201
+    redesign_data = redesign_resp.json()
+    assert redesign_data["version_number"] == 2
+    assert redesign_data["affected_node_ids"] == ["db_primary"]
+    original_nodes = {node["id"]: node for node in version_data["nodes"]}
+    redesigned_nodes = {node["id"]: node for node in redesign_data["nodes"]}
+    assert {
+        node_id: node for node_id, node in original_nodes.items()
+        if node_id != "db_primary"
+    } == {
+        node_id: node for node_id, node in redesigned_nodes.items()
+        if node_id != "db_primary"
+    }
+
+    designs_after_redesign = await async_client.get(
+        f"/api/v1/projects/{project_id}/designs"
+    )
+    assert designs_after_redesign.status_code == 200
+    assert len(designs_after_redesign.json()) == 2
