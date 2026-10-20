@@ -372,7 +372,7 @@ export default function ArchCanvas() {
   )
 
   return (
-    <div className="w-full h-full relative" style={{ minHeight: '100%' }}>
+    <div className="w-full h-full min-h-full relative overflow-hidden" style={{ minHeight: '100%', height: '100%', width: '100%' }}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -386,7 +386,8 @@ export default function ArchCanvas() {
         fitView
         fitViewOptions={{ padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
-        className="bg-[#0B0F17]"
+        className="bg-[#0B0F17] w-full h-full"
+        style={{ width: '100%', height: '100%' }}
         defaultEdgeOptions={{
           animated: true,
           markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },

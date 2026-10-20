@@ -323,7 +323,7 @@ export default function StudioLayout() {
     : null
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden">
       {/* Canvas toolbar */}
       <div className="h-11 flex items-center justify-between px-4 border-b border-slate-800/80 bg-[#0d1117]/90 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -400,9 +400,9 @@ export default function StudioLayout() {
       )}
 
       {/* Canvas area + sidebar */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 w-full h-full min-h-0 overflow-hidden">
         {/* Canvas */}
-        <div className="flex-1 min-w-0 relative">
+        <div className="flex-1 min-w-0 h-full relative overflow-hidden">
           {canvasNodes.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center space-y-4">
@@ -423,7 +423,7 @@ export default function StudioLayout() {
               </div>
             </div>
           ) : (
-            <div className="absolute inset-0">
+            <div className="absolute inset-0 w-full h-full">
               <ArchCanvas key={activeDesign?.id ?? 'manual'} />
             </div>
           )}
@@ -431,7 +431,7 @@ export default function StudioLayout() {
 
         {/* Right sidebar */}
         {sidebarOpen && (
-          <div className="w-72 flex-shrink-0 border-l border-slate-800/80 bg-[#0d1117] flex flex-col overflow-hidden">
+          <div className="w-80 flex-shrink-0 h-full border-l border-slate-800/80 bg-[#0d1117] flex flex-col overflow-hidden">
             {/* Tab bar */}
             <div className="flex border-b border-slate-800/80 flex-shrink-0">
               {TABS.map((tab) => (
@@ -452,7 +452,7 @@ export default function StudioLayout() {
             </div>
 
             {/* Tab content */}
-            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
               {activeCanvasTab === 'component' && <ComponentTab />}
               {activeCanvasTab === 'validation' && <ValidationTab />}
               {activeCanvasTab === 'evidence' && <EvidenceTab />}

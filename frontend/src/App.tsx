@@ -76,7 +76,7 @@ export default function App() {
   const isCanvas = view === 'canvas'
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col font-sans">
+    <div className={`w-full ${isCanvas ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-[#0B0F17] text-slate-100 flex flex-col font-sans`}>
       {/* ── Top Header Bar ─────────────────────────────────────────────────── */}
       <header className="h-16 border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between bg-[#111726]/80 backdrop-blur-md sticky top-0 z-30 flex-shrink-0">
         <div className="flex items-center gap-4 lg:gap-6">
@@ -192,7 +192,7 @@ export default function App() {
       {/* ── Main View Content ──────────────────────────────────────────────── */}
       {isCanvas ? (
         // Canvas gets full remaining height with no padding
-        <div className="flex-1 overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 4rem)' }}>
+        <div className="flex-1 w-full min-h-0 h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
           <StudioLayout />
         </div>
       ) : (
