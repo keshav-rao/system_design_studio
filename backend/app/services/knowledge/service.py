@@ -26,6 +26,8 @@ from app.services.knowledge.providers.qdrant_store import QdrantVectorStore
 
 logger = logging.getLogger(__name__)
 
+CORPUS_SOURCE_PREFIX = "rag_knowledge_base/"
+
 
 class KnowledgeService:
     """
@@ -229,16 +231,38 @@ class KnowledgeService:
         if not root.is_dir():
             raise FileNotFoundError(f"RAG corpus not found at {root.resolve()}")
 
-        stats = {"ingested": 0, "updated": 0, "skipped": 0, "chunks": 0}
+        stats = {"ingested": 0, "updated": 0, "skipped": 0, "deleted": 0, "chunks": 0}
+        seen: set[uuid.UUID] = set()
+        complete_scan = True
         for doc in iter_corpus_documents(root, collections):
+            seen.add(doc.source_id)
             if limit is not None and stats["ingested"] + stats["updated"] >= limit:
+                complete_scan = False
                 break
             source = await db.get(Source, doc.source_id)
             if source is not None and source.version == doc.content_hash:
                 stats["skipped"] += 1
                 continue
+
+            chunks = self.chunker.chunk_markdown(
+                content=doc.text,
+                source_id=str(doc.source_id),
+                title=doc.title,
+                collection=doc.collection,
+                licence=doc.licence,
+                publication_date=doc.publication_date,
+                tags=doc.tags,
+            )
+            # Version chunk IDs so new points never overwrite the old ones; old
+            # points are removed only after the replacement is fully indexed.
+            for i, chunk in enumerate(chunks, start=1):
+                chunk.id = f"{doc.source_id}-{doc.content_hash}-chunk-{i}"
+            chunk_count = await self._embed_and_index(chunks)
+
             if source is not None:
-                await self.vector_store.delete_by_source(str(doc.source_id))
+                await self.vector_store.delete_by_source(
+                    str(doc.source_id), keep_chunk_ids=[c.id for c in chunks]
+                )
                 stats["updated"] += 1
             else:
                 source = Source(id=doc.source_id)
@@ -251,22 +275,36 @@ class KnowledgeService:
             source.licence = doc.licence
             source.publication_date = doc.publication_date
             source.version = doc.content_hash
-            source.permission_notes = f"rag_knowledge_base/{doc.rel_path}"
-
-            chunks = self.chunker.chunk_markdown(
-                content=doc.text,
-                source_id=str(doc.source_id),
-                title=doc.title,
-                collection=doc.collection,
-                licence=doc.licence,
-                publication_date=doc.publication_date,
-                tags=doc.tags,
-            )
-            source.chunk_count = await self._embed_and_index(chunks)
-            stats["chunks"] += source.chunk_count
+            source.permission_notes = f"{CORPUS_SOURCE_PREFIX}{doc.rel_path}"
+            source.chunk_count = chunk_count
+            stats["chunks"] += chunk_count
             await db.commit()
-            logger.info("Indexed %s (%d chunks)", doc.rel_path, source.chunk_count)
+            logger.info("Indexed %s (%d chunks)", doc.rel_path, chunk_count)
+
+        if complete_scan:
+            stats["deleted"] = await self._remove_missing_corpus_sources(
+                db, seen, collections
+            )
         return stats
+
+    async def _remove_missing_corpus_sources(
+        self, db: AsyncSession, seen: set[uuid.UUID], collections: list[str] | None
+    ) -> int:
+        """Drop corpus sources (and their vectors) whose files no longer exist."""
+        stmt = select(Source).where(
+            Source.permission_notes.like(f"{CORPUS_SOURCE_PREFIX}%")
+        )
+        if collections:
+            stmt = stmt.where(Source.collection.in_(collections))
+        removed = 0
+        for source in (await db.execute(stmt)).scalars().all():
+            if source.id in seen:
+                continue
+            await self.vector_store.delete_by_source(str(source.id))
+            await db.delete(source)
+            removed += 1
+        await db.commit()
+        return removed
 
     async def run_evaluation(self, db: AsyncSession) -> EvalRunResult:
         """

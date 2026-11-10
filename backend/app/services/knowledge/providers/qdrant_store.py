@@ -277,8 +277,20 @@ class QdrantVectorStore(BaseVectorStore):
 
         return results
 
-    async def delete_by_source(self, source_id: str) -> int:
+    async def delete_by_source(
+        self, source_id: str, keep_chunk_ids: list[str] | None = None
+    ) -> int:
         await self.initialize()
+        must_not: list[models.Condition] = []
+        if keep_chunk_ids:
+            must_not.append(
+                models.HasIdCondition(
+                    has_id=[
+                        str(uuid.uuid5(uuid.NAMESPACE_DNS, cid))
+                        for cid in keep_chunk_ids
+                    ]
+                )
+            )
         self.client.delete(
             collection_name=self.collection_name,
             points_selector=models.FilterSelector(
@@ -288,7 +300,8 @@ class QdrantVectorStore(BaseVectorStore):
                             key="source_id",
                             match=models.MatchValue(value=source_id),
                         )
-                    ]
+                    ],
+                    must_not=must_not or None,
                 )
             ),
         )

@@ -26,8 +26,10 @@ class BaseVectorStore(ABC):
         """Execute hybrid or dense search with filters."""
 
     @abstractmethod
-    async def delete_by_source(self, source_id: str) -> int:
-        """Delete all chunks belonging to a specific source ID."""
+    async def delete_by_source(
+        self, source_id: str, keep_chunk_ids: list[str] | None = None
+    ) -> int:
+        """Delete chunks of a source ID, except those listed in keep_chunk_ids."""
 
     @abstractmethod
     async def count(self) -> int:

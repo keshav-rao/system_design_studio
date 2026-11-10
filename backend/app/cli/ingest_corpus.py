@@ -40,5 +40,8 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, help="Max new/changed files")
     parser.add_argument("--recreate", action="store_true", help="Rebuild the index")
     parser.add_argument("--eval", action="store_true", help="Run retrieval eval")
+    parsed = parser.parse_args()
+    if parsed.recreate and (parsed.collections or parsed.limit is not None):
+        parser.error("--recreate rebuilds the whole index; omit --collections/--limit")
     logging.basicConfig(level=settings.LOG_LEVEL)
-    asyncio.run(main(parser.parse_args()))
+    asyncio.run(main(parsed))

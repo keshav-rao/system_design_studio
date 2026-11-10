@@ -54,6 +54,8 @@ def _title(text: str, path: Path) -> str:
 def iter_corpus_documents(
     root: Path, collections: list[str] | None = None
 ) -> Iterator[CorpusDocument]:
+    """content_hash covers the text and all indexed metadata, so manifest edits
+    trigger re-indexing."""
     """Read every supported file under root with LlamaIndex, one file at a time."""
     root = root.resolve()
     manifest = _load_manifest(root)
@@ -76,15 +78,24 @@ def iter_corpus_documents(
         if not text.strip():
             continue
         meta = manifest.get(rel_path, {})
+        title = _title(text, path)
+        licence = meta.get("licence", "unspecified")
+        origin_url = meta.get("source_url")
+        publication_date = meta.get("last_verified")
+        tags = list(parts[:-1]) + [
+            str(meta[k]) for k in ("topic", "component") if meta.get(k)
+        ]
+        fingerprint = json.dumps(
+            [text, title, collection, licence, origin_url, publication_date, tags]
+        )
         yield CorpusDocument(
             rel_path=rel_path,
-            title=_title(text, path),
+            title=title,
             collection=collection,
             text=text,
-            content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest()[:16],
-            licence=meta.get("licence", "unspecified"),
-            origin_url=meta.get("source_url"),
-            publication_date=meta.get("last_verified"),
-            tags=[p for p in parts[:-1]]
-            + [str(meta[k]) for k in ("topic", "component") if meta.get(k)],
+            content_hash=hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16],
+            licence=licence,
+            origin_url=origin_url,
+            publication_date=publication_date,
+            tags=tags,
         )

@@ -190,7 +190,13 @@ async def test_ingest_corpus_is_idempotent_and_searchable(
     assert first["ingested"] == 5 and first["chunks"] > 0
 
     second = await test_knowledge_service.ingest_corpus(test_db, corpus)
-    assert second == {"ingested": 0, "updated": 0, "skipped": 5, "chunks": 0}
+    assert second == {
+        "ingested": 0,
+        "updated": 0,
+        "skipped": 5,
+        "deleted": 0,
+        "chunks": 0,
+    }
 
     (corpus / "01_fundamentals" / "cap.md").write_text(
         "# CAP Theorem\nPACELC extends CAP with latency.\n"
@@ -204,3 +210,78 @@ async def test_ingest_corpus_is_idempotent_and_searchable(
         SearchQuery(query="redis streams consumer groups", limit=3)
     )
     assert res.results[0].collection == "redis-docs"
+
+
+@pytest.mark.asyncio
+async def test_ingest_corpus_reindexes_on_manifest_change_and_drops_deleted_files(
+    test_db: AsyncSession, test_knowledge_service: KnowledgeService, corpus: Path
+) -> None:
+    await test_knowledge_service.ingest_corpus(test_db, corpus)
+
+    manifest = json.loads((corpus / "corpus_manifest.json").read_text())
+    manifest["documents"][0]["licence"] = "restricted"
+    (corpus / "corpus_manifest.json").write_text(json.dumps(manifest))
+    (corpus / "redis-docs" / "develop" / "streams.md").unlink()
+
+    stats = await test_knowledge_service.ingest_corpus(test_db, corpus)
+
+    assert stats["deleted"] == 1
+    assert stats["updated"] == 2  # cap.md (licence) + corpus_manifest.json itself
+    sources = {s.title: s for s in (await test_db.execute(select(Source))).scalars()}
+    assert "Redis Streams" not in sources
+    assert sources["CAP Theorem"].licence == "restricted"
+    res = await test_knowledge_service.search(
+        SearchQuery(query="redis streams consumer groups", limit=10)
+    )
+    assert all(r.title != "Redis Streams" for r in res.results)
+
+
+@pytest.mark.asyncio
+async def test_partial_scan_never_deletes_unvisited_sources(
+    test_db: AsyncSession, test_knowledge_service: KnowledgeService, corpus: Path
+) -> None:
+    await test_knowledge_service.ingest_corpus(test_db, corpus)
+    (corpus / "redis-docs" / "develop" / "streams.md").unlink()
+
+    stats = await test_knowledge_service.ingest_corpus(
+        test_db, corpus, collections=["01_fundamentals"]
+    )
+
+    assert stats["deleted"] == 0
+    titles = {s.title for s in (await test_db.execute(select(Source))).scalars()}
+    assert "Redis Streams" in titles
+
+
+@pytest.mark.asyncio
+async def test_failed_update_keeps_previous_vectors(
+    test_db: AsyncSession, test_knowledge_service: KnowledgeService, corpus: Path
+) -> None:
+    await test_knowledge_service.ingest_corpus(test_db, corpus)
+    before = await test_knowledge_service.vector_store.count()
+    (corpus / "01_fundamentals" / "cap.md").write_text("# CAP Theorem\nChanged.\n")
+
+    async def boom(texts: list[str]) -> None:
+        raise RuntimeError("embedding model unavailable")
+
+    test_knowledge_service.embedder.embed_documents = boom  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await test_knowledge_service.ingest_corpus(test_db, corpus)
+
+    assert await test_knowledge_service.vector_store.count() == before
+    res = await test_knowledge_service.search(
+        SearchQuery(query="network partition choose", limit=5)
+    )
+    assert any("partition" in r.text.lower() for r in res.results)
+
+
+def test_cli_rejects_partial_recreate() -> None:
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "app.cli.ingest_corpus", "--recreate", "--limit", "1"],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 2
+    assert "--recreate rebuilds the whole index" in proc.stderr
