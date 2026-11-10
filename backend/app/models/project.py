@@ -42,6 +42,7 @@ class Project(Base):
         nullable=False,
     )
 
+
     design_versions: Mapped[list["DesignVersion"]] = relationship(
         "DesignVersion",
         back_populates="project",
@@ -129,6 +130,7 @@ class DesignVersion(Base):
         default=lambda: datetime.now(UTC),
         nullable=False,
     )
+
 
     project: Mapped[Project] = relationship(
         "Project",

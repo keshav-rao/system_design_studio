@@ -36,7 +36,6 @@ from app.services.validator.validator_service import ValidatorService
 # Helper factory
 # ---------------------------------------------------------------------------
 
-
 def _node(
     id: str,
     slug: str,
@@ -495,20 +494,10 @@ class TestThroughputBottleneck:
     def test_pass_balanced_throughput(self) -> None:
         design = DesignDocument(
             nodes=[
-                _node(
-                    "app",
-                    "fastapi",
-                    "compute",
-                    "application",
-                    limits={"max_throughput_qps": 10000},
-                ),
-                _node(
-                    "db",
-                    "postgresql",
-                    "database",
-                    "data",
-                    limits={"max_throughput_qps": 8000},
-                ),
+                _node("app", "fastapi", "compute", "application",
+                      limits={"max_throughput_qps": 10000}),
+                _node("db", "postgresql", "database", "data",
+                      limits={"max_throughput_qps": 8000}),
             ],
             edges=[_edge("app", "db")],
         )
@@ -518,20 +507,10 @@ class TestThroughputBottleneck:
     def test_fail_severe_bottleneck(self) -> None:
         design = DesignDocument(
             nodes=[
-                _node(
-                    "app",
-                    "fastapi",
-                    "compute",
-                    "application",
-                    limits={"max_throughput_qps": 50000},
-                ),
-                _node(
-                    "db",
-                    "postgresql",
-                    "database",
-                    "data",
-                    limits={"max_throughput_qps": 5000},
-                ),
+                _node("app", "fastapi", "compute", "application",
+                      limits={"max_throughput_qps": 50000}),
+                _node("db", "postgresql", "database", "data",
+                      limits={"max_throughput_qps": 5000}),
             ],
             edges=[_edge("app", "db")],
         )
@@ -564,13 +543,8 @@ class TestValidatorService:
             nodes=[
                 _node("cdn", "cloudflare", "cdn", "edge"),
                 _node("gw", "kong", "gateway", "gateway"),
-                _node(
-                    "app",
-                    "fastapi",
-                    "compute",
-                    "application",
-                    limits={"max_throughput_qps": 20000},
-                ),
+                _node("app", "fastapi", "compute", "application",
+                      limits={"max_throughput_qps": 20000}),
                 _node("cache", "redis", "cache", "data", replicas=2),
                 _node("db", "postgresql", "database", "data", replicas=3),
                 _node("q", "rabbitmq", "queue", "async", replicas=2),
@@ -641,9 +615,11 @@ class TestValidatorService:
         nodes = []
         edges = []
         for i in range(100):
-            nodes.append(_node(f"n{i}", f"svc-{i}", "compute", "application"))
+            nodes.append(
+                _node(f"n{i}", f"svc-{i}", "compute", "application")
+            )
         for i in range(99):
-            edges.append(_edge(f"n{i}", f"n{i + 1}"))
+            edges.append(_edge(f"n{i}", f"n{i+1}"))
 
         design = DesignDocument(
             nodes=nodes,
@@ -715,3 +691,4 @@ async def test_validate_empty_design_rejected(async_client: Any) -> None:
         json={"nodes": []},
     )
     assert resp.status_code == 422  # Pydantic validation error
+

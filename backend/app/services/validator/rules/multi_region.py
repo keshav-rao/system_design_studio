@@ -21,7 +21,9 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
     if design.requirements.regions < 2:
         return issues
 
-    db_nodes = [n for n in design.nodes if n.category.lower() == "database"]
+    db_nodes = [
+        n for n in design.nodes if n.category.lower() == "database"
+    ]
 
     if not db_nodes:
         return issues  # data_store_required handles the missing DB case

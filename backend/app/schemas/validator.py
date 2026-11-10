@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 # Severity
 # ---------------------------------------------------------------------------
 
-
 class Severity(StrEnum):
     """How serious the violation is."""
 
@@ -27,7 +26,6 @@ class Severity(StrEnum):
 # Design input
 # ---------------------------------------------------------------------------
 
-
 class DesignNode(BaseModel):
     """A single component placed in the design."""
 
@@ -35,7 +33,9 @@ class DesignNode(BaseModel):
     slug: str = Field(
         ..., description="Component catalog slug (e.g. 'postgresql', 'redis-cache')"
     )
-    category: str = Field(..., description="Component category from the catalog")
+    category: str = Field(
+        ..., description="Component category from the catalog"
+    )
     layer: str = Field(
         ...,
         description=(
@@ -43,7 +43,9 @@ class DesignNode(BaseModel):
             "data, async, infra, observability"
         ),
     )
-    replicas: int = Field(1, ge=1, description="Number of replicas / instances")
+    replicas: int = Field(
+        1, ge=1, description="Number of replicas / instances"
+    )
     protocols: list[str] = Field(
         default_factory=list,
         description="Protocols this node exposes or consumes",
@@ -89,7 +91,9 @@ class DesignRequirements(BaseModel):
     data_durability_required: bool = Field(
         default=True, description="Whether the design must include durable storage"
     )
-    regions: int = Field(default=1, ge=1, description="Number of deployment regions")
+    regions: int = Field(
+        default=1, ge=1, description="Number of deployment regions"
+    )
 
 
 class DesignDocument(BaseModel):
@@ -110,7 +114,6 @@ class DesignDocument(BaseModel):
 # ---------------------------------------------------------------------------
 # Validation output
 # ---------------------------------------------------------------------------
-
 
 class ValidationIssue(BaseModel):
     """One problem or recommendation found by a rule."""
@@ -150,3 +153,4 @@ class ValidationResult(BaseModel):
     elapsed_ms: float = Field(
         default=0.0, description="Total validation time in milliseconds"
     )
+

@@ -11,6 +11,7 @@ Verifies:
 4. REST API integration for /projects, /interview, and /plan.
 """
 
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -301,12 +302,10 @@ class TestPlannerServiceAndPersistence:
         assert affected_ids == ["db_primary"]
         assert updated_nodes["db_primary"]["replicas"] == 3
         assert {
-            node_id: node
-            for node_id, node in updated_nodes.items()
+            node_id: node for node_id, node in updated_nodes.items()
             if node_id != "db_primary"
         } == {
-            node_id: node
-            for node_id, node in original_nodes.items()
+            node_id: node for node_id, node in original_nodes.items()
             if node_id != "db_primary"
         }
         assert "ITERATIVE REDESIGN" in planner_contexts[0]
@@ -392,12 +391,10 @@ async def test_project_and_planner_api(async_client: AsyncClient) -> None:
     original_nodes = {node["id"]: node for node in version_data["nodes"]}
     redesigned_nodes = {node["id"]: node for node in redesign_data["nodes"]}
     assert {
-        node_id: node
-        for node_id, node in original_nodes.items()
+        node_id: node for node_id, node in original_nodes.items()
         if node_id != "db_primary"
     } == {
-        node_id: node
-        for node_id, node in redesigned_nodes.items()
+        node_id: node for node_id, node in redesigned_nodes.items()
         if node_id != "db_primary"
     }
 

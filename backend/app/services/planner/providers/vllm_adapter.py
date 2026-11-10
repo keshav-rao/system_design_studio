@@ -11,6 +11,7 @@ from app.services.planner.providers.ollama_adapter import clean_deepseek_r1_outp
 logger = logging.getLogger(__name__)
 
 
+
 class VLLMAdapter(BaseLLMAdapter):
     """Adapter connecting to a vLLM server serving DeepSeek-R1-Distill-Qwen-32B."""
 

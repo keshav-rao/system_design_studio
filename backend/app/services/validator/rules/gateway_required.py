@@ -23,9 +23,12 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
     """Flag designs with multiple app services but no gateway."""
     issues: list[ValidationIssue] = []
 
-    app_nodes = [n for n in design.nodes if n.layer.lower() == _APP_LAYER]
+    app_nodes = [
+        n for n in design.nodes if n.layer.lower() == _APP_LAYER
+    ]
     has_gateway = any(
-        n.category.lower() in _GATEWAY_CATEGORIES or n.layer.lower() in _GATEWAY_LAYERS
+        n.category.lower() in _GATEWAY_CATEGORIES
+        or n.layer.lower() in _GATEWAY_LAYERS
         for n in design.nodes
     )
 

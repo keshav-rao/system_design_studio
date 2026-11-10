@@ -33,7 +33,9 @@ class EvidenceLink(BaseModel):
         default=None, description="Heading breadcrumbs (e.g. # Caching > ## Redis)"
     )
     snippet: str = Field(..., description="Excerpt supporting the decision")
-    relevance_score: float = Field(default=0.0, description="Rerank or retrieval score")
+    relevance_score: float = Field(
+        default=0.0, description="Rerank or retrieval score"
+    )
 
 
 class AlternativeConsidered(BaseModel):
@@ -47,7 +49,9 @@ class AlternativeConsidered(BaseModel):
     considered_against: str = Field(
         ..., description="Alternative that was compared against"
     )
-    rationale: str = Field(..., description="Architectural reasoning for the selection")
+    rationale: str = Field(
+        ..., description="Architectural reasoning for the selection"
+    )
 
 
 class ArchitectureProposal(BaseModel):
