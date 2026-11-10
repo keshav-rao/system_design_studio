@@ -307,6 +307,15 @@ class QdrantVectorStore(BaseVectorStore):
         )
         return 1
 
+    async def delete_chunks(self, chunk_ids: list[str]) -> None:
+        await self.initialize()
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.PointIdsList(
+                points=[str(uuid.uuid5(uuid.NAMESPACE_DNS, c)) for c in chunk_ids]
+            ),
+        )
+
     async def count(self) -> int:
         await self.initialize()
         try:

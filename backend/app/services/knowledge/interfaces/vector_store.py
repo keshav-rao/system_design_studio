@@ -32,5 +32,9 @@ class BaseVectorStore(ABC):
         """Delete chunks of a source ID, except those listed in keep_chunk_ids."""
 
     @abstractmethod
+    async def delete_chunks(self, chunk_ids: list[str]) -> None:
+        """Delete specific chunks by chunk ID."""
+
+    @abstractmethod
     async def count(self) -> int:
         """Count total chunks currently indexed in vector store."""

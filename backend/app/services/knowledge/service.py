@@ -264,7 +264,15 @@ class KnowledgeService:
             # points are removed only after the replacement is fully indexed.
             for i, chunk in enumerate(chunks, start=1):
                 chunk.id = f"{doc.source_id}-{doc.content_hash}-chunk-{i}"
-            chunk_count = await self._embed_and_index(chunks)
+            try:
+                chunk_count = await self._embed_and_index(
+                    chunks, batch_size=settings.EMBEDDING_BATCH_SIZE
+                )
+            except Exception:
+                # Batches upsert independently; drop any partial replacement so
+                # only the previous version stays searchable.
+                await self.vector_store.delete_chunks([c.id for c in chunks])
+                raise
 
             if source is not None:
                 await self.vector_store.delete_by_source(

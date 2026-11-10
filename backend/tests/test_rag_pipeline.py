@@ -280,6 +280,42 @@ async def test_failed_update_keeps_previous_vectors(
 
 
 @pytest.mark.asyncio
+async def test_failure_in_later_batch_rolls_back_partial_replacement(
+    test_db: AsyncSession,
+    test_knowledge_service: KnowledgeService,
+    corpus: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await test_knowledge_service.ingest_corpus(test_db, corpus)
+    before = await test_knowledge_service.vector_store.count()
+    (corpus / "01_fundamentals" / "cap.md").write_text(
+        "# CAP Theorem\n## Part one\nFirst replacement.\n"
+        "## Part two\nSecond replacement.\n"
+    )
+    monkeypatch.setattr(settings, "EMBEDDING_BATCH_SIZE", 1)
+    real_embed = test_knowledge_service.embedder.embed_documents
+    calls = 0
+
+    async def fail_second(texts: list[str]):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("embedding model unavailable")
+        return await real_embed(texts)
+
+    test_knowledge_service.embedder.embed_documents = fail_second  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await test_knowledge_service.ingest_corpus(test_db, corpus)
+
+    assert calls == 2
+    assert await test_knowledge_service.vector_store.count() == before
+    res = await test_knowledge_service.search(
+        SearchQuery(query="first replacement", limit=10)
+    )
+    assert all("replacement" not in r.text.lower() for r in res.results)
+
+
+@pytest.mark.asyncio
 async def test_pruning_skips_alternate_roots_and_uploaded_documents(
     test_db: AsyncSession,
     test_knowledge_service: KnowledgeService,
