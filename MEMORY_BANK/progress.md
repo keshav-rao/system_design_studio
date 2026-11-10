@@ -101,6 +101,11 @@
 - Added service and API regression coverage proving unrelated components are preserved.
 - Validation: all 74 backend tests pass; focused redesign API test passes; Ruff and Mypy pass; frontend production build and TypeScript checks pass.
 
+## Normalized Design Storage
+- Alembic `004_normalized`: `users`, `requirements`, `designs`, `design_nodes`, `design_edges`, `node_evidence`, `validation_issues`, `component_alternatives`; `projects.user_id/status`; compatibility rows linked to component IDs. Migrates and drops `design_versions` (downgrade rebuilds it).
+- Repository layer (`app/repositories/`): `ProjectRepository`, `DesignRepository`; planner service no longer touches ORM queries directly.
+- Nodes carry `rationale`, `evidence_ids`, `assumptions`, `alternatives`, `position`; planner auto-attributes evidence to nodes by slug/category terms when the LLM omits IDs.
+
 ## In Progress
 - Phase 6 complete.
 

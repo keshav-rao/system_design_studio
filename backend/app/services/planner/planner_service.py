@@ -5,19 +5,26 @@ import logging
 import uuid
 from typing import Any
 
-from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.models.project import DesignVersion, Project
+from app.models.project import Project
+from app.repositories import DesignRepository, ProjectRepository
 from app.schemas.planner import (
+    DesignSnapshot,
+    DesignVersionResponse,
+    EvidenceLink,
     InterviewRequest,
     InterviewResponse,
     PlanRequest,
     ProjectCreate,
     RedesignRequest,
 )
-from app.schemas.validator import DesignDocument, DesignNode, DesignRequirements
+from app.schemas.validator import (
+    DesignDocument,
+    DesignEdge,
+    DesignNode,
+    DesignRequirements,
+)
 from app.services.catalog.catalog_service import CatalogService
 from app.services.knowledge.service import KnowledgeService
 from app.services.planner.graph import ArchitecturePlannerGraph
@@ -57,41 +64,19 @@ class PlannerService:
 
     async def create_project(self, req: ProjectCreate, db: AsyncSession) -> Project:
         """Create a new architecture design project."""
-        project = Project(
-            id=uuid.uuid4(),
-            name=req.name,
-            description=req.description,
-        )
-        db.add(project)
-        await db.commit()
-        await db.refresh(project)
-        return project
+        return await ProjectRepository(db).create(req.name, req.description)
 
     async def list_projects(
         self, db: AsyncSession, limit: int = 50, offset: int = 0
-    ) -> list[Project]:
-        """List all architecture projects."""
-        stmt = (
-            select(Project)
-            .options(selectinload(Project.design_versions))
-            .order_by(desc(Project.created_at))
-            .limit(limit)
-            .offset(offset)
-        )
-        result = await db.execute(stmt)
-        return list(result.scalars().all())
+    ) -> list[tuple[Project, int]]:
+        """List projects with their design version counts."""
+        return await ProjectRepository(db).list_with_version_counts(limit, offset)
 
     async def get_project(
         self, project_id: uuid.UUID, db: AsyncSession
     ) -> Project | None:
         """Retrieve project by ID."""
-        stmt = (
-            select(Project)
-            .options(selectinload(Project.design_versions))
-            .where(Project.id == project_id)
-        )
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        return await ProjectRepository(db).get(project_id)
 
     # -----------------------------------------------------------------------
     # Requirements Interview
@@ -110,24 +95,15 @@ class PlannerService:
         project_id: uuid.UUID,
         req: PlanRequest,
         db: AsyncSession,
-    ) -> DesignVersion:
-        """Execute LangGraph workflow and persist proposal as a DesignVersion."""
-        project = await self.get_project(project_id, db)
+    ) -> DesignVersionResponse:
+        """Execute LangGraph workflow and persist the proposal as a new version."""
+        projects = ProjectRepository(db)
+        project = await projects.get(project_id)
         if not project:
             raise ValueError(f"Project with ID '{project_id}' not found.")
 
-        # Determine next version number
-        stmt = (
-            select(DesignVersion.version_number)
-            .where(DesignVersion.project_id == project_id)
-            .order_by(desc(DesignVersion.version_number))
-            .limit(1)
-        )
-        last_version = (await db.execute(stmt)).scalar_one_or_none() or 0
-        next_version = last_version + 1
-
-        # Resolve requirements: from explicit request or inferred from interview
         final_reqs = req.requirements
+        assumed_keys: set[str] = set()
         if not final_reqs and req.interview_answers:
             interview_res = self.interview_service.process_interview(
                 InterviewRequest(
@@ -136,8 +112,12 @@ class PlannerService:
                 )
             )
             final_reqs = interview_res.inferred_requirements
+            answered = {a.question_id for a in req.interview_answers}
+            assumed_keys = set(final_reqs.model_dump()) - answered
+        elif not final_reqs:
+            assumed_keys = set(DesignRequirements.model_fields)
 
-        # Run LangGraph pipeline
+        await projects.set_status(project, "planning")
         state = await self.graph.plan(
             app_description=req.app_description,
             requirements=final_reqs,
@@ -145,45 +125,48 @@ class PlannerService:
 
         proposal_data: dict[str, Any] = state.get("proposal") or {}
         if not proposal_data:
-            # Fallback if generation failed even after retries
+            await projects.set_status(project, "interviewing")
             raise RuntimeError(
                 f"Architecture generation failed: {state.get('error_message')}"
             )
 
-        # Build and store DesignVersion snapshot
-        design_version = DesignVersion(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            version_number=next_version,
-            title=proposal_data.get("title", f"Design v{next_version}"),
-            summary=proposal_data.get("summary", ""),
-            requirements=proposal_data.get("requirements", {}),
-            nodes=proposal_data.get("nodes", []),
-            edges=proposal_data.get("edges", []),
-            assumptions=proposal_data.get("assumptions", []),
-            evidence_links=proposal_data.get("evidence_links", []),
-            alternatives_considered=proposal_data.get("alternatives_considered", []),
-            validation_issues=state.get("validation_issues", []),
-            is_valid=state.get("is_valid", False),
+        snapshot = DesignSnapshot.model_validate(
+            {
+                **proposal_data,
+                "title": proposal_data.get("title") or "",
+                "validation_issues": state.get("validation_issues", []),
+            }
         )
-
-        db.add(design_version)
-        await db.commit()
-        await db.refresh(design_version)
-        return design_version
+        self._link_node_evidence(snapshot)
+        await projects.upsert_requirements(
+            project_id, snapshot.requirements.model_dump(), assumed_keys
+        )
+        designs = DesignRepository(db)
+        latest = await designs.latest(project_id)
+        design = await designs.create(
+            project_id,
+            snapshot,
+            parent_version=latest.version if latest else None,
+            creator="planner",
+        )
+        await projects.set_status(project, "designed")
+        return DesignRepository.to_response(design)
 
     async def redesign(
         self,
         project_id: uuid.UUID,
         req: RedesignRequest,
         db: AsyncSession,
-    ) -> tuple[DesignVersion, list[str]]:
+    ) -> tuple[DesignVersionResponse, list[str]]:
         """Re-plan an affected subgraph and persist it as a new version."""
-        previous = await self.get_latest_design_version(project_id, db)
-        if previous is None:
+        designs = DesignRepository(db)
+        previous_design = await designs.latest(project_id)
+        if previous_design is None:
             raise LookupError(f"No design versions found for project '{project_id}'.")
+        previous = DesignRepository.to_snapshot(previous_design)
+        previous_edges = [e.model_dump() for e in previous.edges]
 
-        old_requirements = DesignRequirements.model_validate(previous.requirements)
+        old_requirements = previous.requirements
         old_requirement_values = old_requirements.model_dump()
         new_requirements = req.requirements or old_requirements
         changed_requirements = {
@@ -191,7 +174,7 @@ class PlannerService:
             for key, value in new_requirements.model_dump().items()
             if value != old_requirement_values.get(key)
         }
-        old_nodes = [DesignNode.model_validate(node) for node in previous.nodes]
+        old_nodes = previous.nodes
         nodes_by_id = {node.id: node for node in old_nodes}
         unknown_ids = set(req.affected_node_ids) - nodes_by_id.keys()
         if unknown_ids:
@@ -212,7 +195,7 @@ class PlannerService:
             )
 
         scope_ids = set(seeds)
-        for edge in previous.edges:
+        for edge in previous_edges:
             if edge["source_id"] in seeds:
                 scope_ids.add(edge["target_id"])
             if edge["target_id"] in seeds:
@@ -287,7 +270,7 @@ class PlannerService:
         ] + [node.model_dump() for node in new_nodes]
         retained_edges = [
             edge
-            for edge in previous.edges
+            for edge in previous_edges
             if edge["source_id"] not in seeds and edge["target_id"] not in seeds
         ]
         new_edges = [
@@ -306,38 +289,47 @@ class PlannerService:
             )
         )
 
-        design_version = DesignVersion(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            version_number=previous.version_number + 1,
+        next_version = previous_design.version + 1
+        snapshot = DesignSnapshot(
             title=previous.title,
             summary=(
                 f"{previous.summary}\n\n"
-                f"Redesign v{previous.version_number + 1}: "
+                f"Redesign v{next_version}: "
                 f"{proposal_data.get('summary', previous.summary)}"
             ),
-            requirements=new_requirements.model_dump(),
-            nodes=merged_nodes,
-            edges=merged_edges,
+            requirements=new_requirements,
+            nodes=[DesignNode.model_validate(n) for n in merged_nodes],
+            edges=[DesignEdge.model_validate(e) for e in merged_edges],
             assumptions=list(
                 dict.fromkeys(
                     previous.assumptions + proposal_data.get("assumptions", [])
                 )
             ),
             evidence_links=self._merge_records(
-                previous.evidence_links, proposal_data.get("evidence_links", [])
+                [e.model_dump() for e in previous.evidence_links],
+                proposal_data.get("evidence_links", []),
             ),
             alternatives_considered=self._merge_records(
-                previous.alternatives_considered,
+                [a.model_dump() for a in previous.alternatives_considered],
                 proposal_data.get("alternatives_considered", []),
             ),
-            validation_issues=[issue.model_dump() for issue in validation.issues],
-            is_valid=validation.valid,
+            unaddressed_requirements=proposal_data.get(
+                "unaddressed_requirements", previous.unaddressed_requirements
+            ),
+            open_questions=proposal_data.get("open_questions", previous.open_questions),
+            validation_issues=validation.issues,
         )
-        db.add(design_version)
-        await db.commit()
-        await db.refresh(design_version)
-        return design_version, sorted(seeds)
+        self._link_node_evidence(snapshot)
+        await ProjectRepository(db).upsert_requirements(
+            project_id, new_requirements.model_dump(), set()
+        )
+        design = await designs.create(
+            project_id,
+            snapshot,
+            parent_version=previous_design.version,
+            creator="planner",
+        )
+        return DesignRepository.to_response(design, sorted(seeds)), sorted(seeds)
 
     @staticmethod
     def _nodes_affected_by_change(
@@ -402,27 +394,48 @@ class PlannerService:
             merged[key] = record
         return list(merged.values())
 
+    @staticmethod
+    def _link_node_evidence(snapshot: DesignSnapshot) -> None:
+        """Give evidence stable IDs and attribute it to the nodes it mentions."""
+        for idx, link in enumerate(snapshot.evidence_links):
+            if not link.id:
+                link.id = link.chunk_id or f"ev{idx + 1}"
+        known = {link.id for link in snapshot.evidence_links}
+        for node in snapshot.nodes:
+            node.evidence_ids = [e for e in node.evidence_ids if e in known]
+            if node.evidence_ids:
+                continue
+            terms = {
+                t
+                for t in (
+                    node.slug.lower().replace("_", "-").split("-")
+                    + [node.category.lower()]
+                )
+                if len(t) > 2
+            }
+            node.evidence_ids = [
+                link.id
+                for link in snapshot.evidence_links
+                if link.id and _mentions_any(link, terms)
+            ]
+
     async def list_design_versions(
         self, project_id: uuid.UUID, db: AsyncSession
-    ) -> list[DesignVersion]:
-        """List all historical design versions for a project."""
-        stmt = (
-            select(DesignVersion)
-            .where(DesignVersion.project_id == project_id)
-            .order_by(desc(DesignVersion.version_number))
-        )
-        result = await db.execute(stmt)
-        return list(result.scalars().all())
+    ) -> list[DesignVersionResponse]:
+        """List all historical design versions for a project, newest first."""
+        designs = await DesignRepository(db).list_for_project(project_id)
+        return [DesignRepository.to_response(d) for d in designs]
 
     async def get_latest_design_version(
         self, project_id: uuid.UUID, db: AsyncSession
-    ) -> DesignVersion | None:
+    ) -> DesignVersionResponse | None:
         """Get latest design version for a project."""
-        stmt = (
-            select(DesignVersion)
-            .where(DesignVersion.project_id == project_id)
-            .order_by(desc(DesignVersion.version_number))
-            .limit(1)
-        )
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        design = await DesignRepository(db).latest(project_id)
+        return DesignRepository.to_response(design) if design else None
+
+
+def _mentions_any(link: EvidenceLink, terms: set[str]) -> bool:
+    haystack = " ".join(
+        [link.source_title, link.section_path or "", link.snippet]
+    ).lower()
+    return any(term in haystack for term in terms)

@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.catalog_seed import SEED_COMPATIBILITIES, SEED_COMPONENTS
-from app.models.catalog import Component, ComponentCompatibility
+from app.models.catalog import Component, ComponentAlternative, ComponentCompatibility
 from app.schemas.catalog import (
     CompatibilityCheckResponse,
     CompatibilityEdgeCreate,
@@ -419,6 +419,7 @@ class CatalogService:
     ) -> dict[str, int]:
         """Seeds the standard 38+ components and compatibility matrix idempotently."""
         if force:
+            await db.execute(delete(ComponentAlternative))
             await db.execute(delete(ComponentCompatibility))
             await db.execute(delete(Component))
             await db.commit()
@@ -492,6 +493,7 @@ class CatalogService:
                 edges_seeded += 1
 
         await db.commit()
+        await self._sync_component_links(db)
 
         return {
             "components_total": len(SEED_COMPONENTS),
@@ -499,6 +501,34 @@ class CatalogService:
             "edges_total": len(SEED_COMPATIBILITIES),
             "edges_inserted": edges_seeded,
         }
+
+
+    async def _sync_component_links(self, db: AsyncSession) -> None:
+        """Resolve compatibility slugs to component IDs and mirror alternatives."""
+        ids = {
+            slug.lower(): cid
+            for slug, cid in (await db.execute(select(Component.slug, Component.id)))
+        }
+        for edge in (await db.execute(select(ComponentCompatibility))).scalars():
+            edge.source_component_id = ids.get(edge.source_slug.lower())
+            edge.target_component_id = ids.get(edge.target_slug.lower())
+
+        existing = {
+            (row.component_id, row.alternative_id)
+            for row in (await db.execute(select(ComponentAlternative))).scalars()
+        }
+        for comp in (await db.execute(select(Component))).scalars():
+            for alt_slug in comp.alternatives or []:
+                alt_id = ids.get(str(alt_slug).lower())
+                if alt_id is None or alt_id == comp.id:
+                    continue
+                if (comp.id, alt_id) not in existing:
+                    alt = ComponentAlternative(
+                        component_id=comp.id, alternative_id=alt_id
+                    )
+                    db.add(alt)
+                    existing.add((comp.id, alt_id))
+        await db.commit()
 
 
 catalog_service = CatalogService()

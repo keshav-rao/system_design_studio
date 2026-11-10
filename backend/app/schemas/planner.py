@@ -24,6 +24,11 @@ class EvidenceLink(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    id: str | None = Field(
+        default=None,
+        description="Evidence identifier referenced by DesignNode.evidence_ids",
+    )
+    chunk_id: str | None = Field(default=None, description="Knowledge chunk ID")
     source_id: str | None = Field(
         default=None, description="UUID string of source document if known"
     )
@@ -87,6 +92,13 @@ class ArchitectureProposal(BaseModel):
     alternatives_considered: list[AlternativeConsidered] = Field(
         default_factory=list,
         description="Tradeoffs and alternatives evaluated",
+    )
+    unaddressed_requirements: list[str] = Field(
+        default_factory=list,
+        description="Requirements the proposal does not cover",
+    )
+    open_questions: list[str] = Field(
+        default_factory=list, description="Questions to resolve with the user"
     )
 
     def as_design_document(self) -> DesignDocument:
@@ -177,6 +189,7 @@ class ProjectResponse(BaseModel):
     description: str | None = None
     created_at: datetime
     updated_at: datetime
+    status: str = "interviewing"
     versions_count: int = 0
 
 
@@ -209,21 +222,33 @@ class RedesignRequest(BaseModel):
     )
 
 
-class DesignVersionResponse(BaseModel):
+class DesignSnapshot(BaseModel):
+    """Content of a design version, independent of storage."""
+
+    title: str
+    summary: str = ""
+    requirements: DesignRequirements = Field(default_factory=DesignRequirements)
+    nodes: list[DesignNode] = Field(default_factory=list)
+    edges: list[DesignEdge] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    evidence_links: list[EvidenceLink] = Field(default_factory=list)
+    alternatives_considered: list[AlternativeConsidered] = Field(
+        default_factory=list
+    )
+    unaddressed_requirements: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+    validation_issues: list[ValidationIssue] = Field(default_factory=list)
+
+
+class DesignVersionResponse(DesignSnapshot):
     """A full design proposal version."""
 
     id: uuid.UUID
     project_id: uuid.UUID
     version_number: int
-    title: str
-    summary: str
-    requirements: DesignRequirements
-    nodes: list[DesignNode]
-    edges: list[DesignEdge]
-    assumptions: list[str]
-    evidence_links: list[EvidenceLink]
-    alternatives_considered: list[AlternativeConsidered]
-    validation_issues: list[ValidationIssue]
+    parent_version: int | None = None
+    creator: str = "planner"
+    validation_status: str = "valid"
     is_valid: bool
     created_at: datetime
     affected_node_ids: list[str] = Field(

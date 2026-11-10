@@ -7,7 +7,7 @@ Verifies:
    - Schema valid ArchitectureProposal
    - Grounded in catalog facts and knowledge base evidence
    - Passes deterministic validation
-   - Persisted as an immutable DesignVersion in PostgreSQL / SQLite
+   - Persisted as an immutable normalized Design version in PostgreSQL / SQLite
 4. REST API integration for /projects, /interview, and /plan.
 """
 
@@ -24,7 +24,7 @@ from app.schemas.planner import (
     ProjectCreate,
     RedesignRequest,
 )
-from app.schemas.validator import DesignNode, DesignRequirements
+from app.schemas.validator import DesignRequirements
 from app.services.planner.graph import ArchitecturePlannerGraph
 from app.services.planner.interview_service import InterviewService
 from app.services.planner.planner_service import PlannerService
@@ -245,9 +245,9 @@ class TestPlannerServiceAndPersistence:
             ),
             db=test_db,
         )
-        original_nodes = {node["id"]: node for node in first_version.nodes}
+        original_nodes = {node.id: node.model_dump() for node in first_version.nodes}
         inferred_scope = service._nodes_affected_by_change(
-            [DesignNode.model_validate(node) for node in first_version.nodes],
+            first_version.nodes,
             {"expected_users"},
             "Increase user count",
         )
@@ -297,7 +297,7 @@ class TestPlannerServiceAndPersistence:
             db=test_db,
         )
 
-        updated_nodes = {node["id"]: node for node in next_version.nodes}
+        updated_nodes = {node.id: node.model_dump() for node in next_version.nodes}
         assert next_version.version_number == first_version.version_number + 1
         assert affected_ids == ["db_primary"]
         assert updated_nodes["db_primary"]["replicas"] == 3

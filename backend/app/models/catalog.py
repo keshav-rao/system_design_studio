@@ -2,7 +2,15 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
@@ -65,6 +73,18 @@ class ComponentCompatibility(Base):
     )
     source_slug: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     target_slug: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    source_component_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("components.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    target_component_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("components.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     is_compatible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     protocol: Mapped[str | None] = mapped_column(String(100), nullable=True)
     recommended_pattern: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -75,3 +95,24 @@ class ComponentCompatibility(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+
+
+class ComponentAlternative(Base):
+    __tablename__ = "component_alternatives"
+    __table_args__ = (UniqueConstraint("component_id", "alternative_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    component_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("components.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    alternative_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("components.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    when_to_prefer: Mapped[str | None] = mapped_column(Text, nullable=True)
