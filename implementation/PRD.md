@@ -21,15 +21,14 @@ An explainable, evidence-backed architecture assistant. Every recommendation cit
 ## Non-goals for v1
 - Auto-deployment or infrastructure-as-code generation.
 - Fine-tuning before evaluation demonstrates a need.
-- Ingesting copyrighted material without a licence or permission.
 
 ## MVP features
 1. Requirements interview covering concurrency, geography, message volume, privacy, availability, and budget.
-2. Hybrid retrieval over foundations, patterns, cloud documentation, capacity planning, and case studies.
+2. Hybrid retrieval (LlamaIndex + Qdrant) over the full `rag_knowledge_base/` corpus: fundamentals, cloud frameworks, component guides, reference architectures, performance, cost/capacity, ADRs, microservices patterns, and vendor docs.
 3. Structured component catalog with purpose, interfaces, compatibility, scaling traits, failure modes, alternatives, and cost units.
-4. DeepSeek-R1 planner producing a schema-valid proposal from requirements and evidence.
+4. DeepSeek-R1 planner, orchestrated as a LangGraph agent, producing a schema-valid proposal from requirements and evidence.
 5. Deterministic validation for components, connections, constraints, assumptions, failure points, and unaddressed requirements.
-6. Editable architecture canvas with component explanations and citations.
+6. Infinite whiteboard canvas (SystemSketcher-style) with a searchable component palette, drawing tools, templates, smart catalog-aware suggestions, component explanations, and citations.
 7. Iterative redesign with re-retrieval and partial re-planning after edits.
 
 ## Success metrics
@@ -39,11 +38,19 @@ An explainable, evidence-backed architecture assistant. Every recommendation cit
 - Track user ratings and the share of designs edited instead of discarded.
 - First proposal in under 60 seconds on target hardware.
 
+## Target hardware (minimum, development/test)
+- CPU: AMD Ryzen 9 7950X or Intel i9-14900K
+- RAM: 64 GB DDR5
+- GPU: NVIDIA RTX 4090 (24 GB VRAM)
+- Storage: 2 TB NVMe SSD
+
+With DeepSeek-R1-Distill-Qwen-32B quantized (~20 GB VRAM), the embedder and reranker run on CPU by default.
+
 ## Risks and mitigations
 - Hallucinated components or invalid connections: catalog source of truth plus validator.
 - Stale cloud facts: date time-sensitive sources and refresh them on a schedule.
-- Copyright risk: record a licence for every source.
+- Source provenance: everything in `rag_knowledge_base/` (including books) is the authoritative corpus; record title, origin, and licence/permission notes for every source.
 - Weak retrieval: evaluate embedding and reranker candidates against a project question set.
 
 ## Post-MVP
-Simulation, richer cost estimates, Markdown/PDF/Mermaid export, shareable designs, evaluation dashboard, and optional fine-tuning after failure analysis.
+Simulation, richer cost estimates, PDF export, sketch-to-diagram (requires a vision model), shareable designs, multi-user sign-in, evaluation dashboard, and optional fine-tuning after failure analysis.

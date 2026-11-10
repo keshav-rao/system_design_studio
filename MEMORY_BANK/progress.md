@@ -102,11 +102,15 @@
 - Validation: all 74 backend tests pass; focused redesign API test passes; Ruff and Mypy pass; frontend production build and TypeScript checks pass.
 
 ## In Progress
-- Phase 6 complete.
+- Docs/code alignment (see activeContext).
 
 ## Upcoming
 - **Phase 7**: Evaluation and hardening.
 
 ## Known Issues
-- None.
+- `HybridEmbedder` silently falls back to deterministic vectors because FastEmbed does not support `BAAI/bge-m3`; Phase 1 metrics were likely measured on fallback vectors.
+- Design storage is a denormalized `design_versions` JSONB row; nodes lack per-node evidence IDs, assumptions, and alternatives (FR7).
+- 8 of the initial validation rules in TECHNICAL_REQUIREMENTS are not implemented.
+- Missing endpoints: per-project interview, project validate, `PATCH /design`, streaming plan.
+- Frontend: hand-written API types, no TanStack Query, several components over ~200 lines, dark theme only.
 
