@@ -8,8 +8,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.source import Source
-from app.schemas.knowledge import SearchQuery, SearchResult
+from app.schemas.knowledge import KnowledgeIngestRequest, SearchQuery, SearchResult
 from app.services.knowledge.ingestion.corpus_loader import (
     ROOT_COLLECTION,
     iter_corpus_documents,
@@ -214,8 +215,12 @@ async def test_ingest_corpus_is_idempotent_and_searchable(
 
 @pytest.mark.asyncio
 async def test_ingest_corpus_reindexes_on_manifest_change_and_drops_deleted_files(
-    test_db: AsyncSession, test_knowledge_service: KnowledgeService, corpus: Path
+    test_db: AsyncSession,
+    test_knowledge_service: KnowledgeService,
+    corpus: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(settings, "RAG_CORPUS_PATH", str(corpus))
     await test_knowledge_service.ingest_corpus(test_db, corpus)
 
     manifest = json.loads((corpus / "corpus_manifest.json").read_text())
@@ -272,6 +277,38 @@ async def test_failed_update_keeps_previous_vectors(
         SearchQuery(query="network partition choose", limit=5)
     )
     assert any("partition" in r.text.lower() for r in res.results)
+
+
+@pytest.mark.asyncio
+async def test_pruning_skips_alternate_roots_and_uploaded_documents(
+    test_db: AsyncSession,
+    test_knowledge_service: KnowledgeService,
+    corpus: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "RAG_CORPUS_PATH", str(corpus))
+    await test_knowledge_service.ingest_corpus(test_db)
+    await test_knowledge_service.ingest_document(
+        KnowledgeIngestRequest(
+            title="Uploaded runbook",
+            collection="uploads",
+            content="# Runbook\nRestart the worker pool.",
+            permission_notes="rag_knowledge_base/uploads/runbook.md",
+        ),
+        test_db,
+    )
+    other = tmp_path / "other_corpus" / "notes"
+    other.mkdir(parents=True)
+    (other / "extra.md").write_text("# Extra\nSomething else.\n")
+
+    alt = await test_knowledge_service.ingest_corpus(test_db, other.parent)
+    full = await test_knowledge_service.ingest_corpus(test_db)
+
+    assert alt["deleted"] == 0
+    assert full["deleted"] == 1  # only the alternate-root file is pruned
+    titles = {s.title for s in (await test_db.execute(select(Source))).scalars()}
+    assert {"Redis Streams", "Uploaded runbook"} <= titles
 
 
 def test_cli_rejects_partial_recreate() -> None:

@@ -29,6 +29,12 @@ logger = logging.getLogger(__name__)
 CORPUS_SOURCE_PREFIX = "rag_knowledge_base/"
 
 
+def _is_corpus_source(source: Source) -> bool:
+    """Corpus sources have IDs derived from their path; uploads have random IDs."""
+    rel_path = (source.permission_notes or "").removeprefix(CORPUS_SOURCE_PREFIX)
+    return source.id == uuid.uuid5(uuid.NAMESPACE_URL, f"corpus://{rel_path}")
+
+
 class KnowledgeService:
     """
     Core orchestrator for knowledge ingestion, chunking, hybrid vector indexing,
@@ -227,7 +233,8 @@ class KnowledgeService:
         Idempotent: unchanged files (same content hash) are skipped and changed
         files are re-chunked and re-indexed.
         """
-        root = root or Path(settings.RAG_CORPUS_PATH)
+        default_root = Path(settings.RAG_CORPUS_PATH)
+        root = root or default_root
         if not root.is_dir():
             raise FileNotFoundError(f"RAG corpus not found at {root.resolve()}")
 
@@ -281,7 +288,9 @@ class KnowledgeService:
             await db.commit()
             logger.info("Indexed %s (%d chunks)", doc.rel_path, chunk_count)
 
-        if complete_scan:
+        # Only a full scan of the configured corpus may prune; an alternate --path
+        # holds a different file set and must not delete the main corpus.
+        if complete_scan and root.resolve() == default_root.resolve():
             stats["deleted"] = await self._remove_missing_corpus_sources(
                 db, seen, collections
             )
@@ -298,7 +307,7 @@ class KnowledgeService:
             stmt = stmt.where(Source.collection.in_(collections))
         removed = 0
         for source in (await db.execute(stmt)).scalars().all():
-            if source.id in seen:
+            if source.id in seen or not _is_corpus_source(source):
                 continue
             await self.vector_store.delete_by_source(str(source.id))
             await db.delete(source)
