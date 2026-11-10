@@ -20,3 +20,11 @@
 3. **Resilient Local & Offline Fallback**: In addition to Ollama and vLLM providers, a deterministic `MockLLMAdapter` is provided for offline development and CI. When Ollama/vLLM endpoints are unreachable or the model is not yet loaded, adapters gracefully fall back to mock generation with logged warnings rather than crashing the system.
 4. **Hugging Face Bucket Integration**: Model weights for `DeepSeek-R1-Distill-Qwen-32B` hosted in user bucket `keshavrao887/DeepSeek-R1-Distill-Qwen-32B-bucket` are supported via configuration settings and the automated `scripts/sync_model_bucket.ps1` synchronization utility.
 5. **Immutable Design Version Snapshots**: Proposals are persisted as append-only `DesignVersion` records linked to parent `Project` entities, preserving exact requirements, node/edge configurations, evidence citations, alternative tradeoffs, and deterministic validation issues.
+
+## Post-Phase 6 Decisions (docs alignment)
+1. **LlamaIndex for RAG, LangGraph for agents**: LlamaIndex handles ingestion, chunking, embedding, hybrid retrieval, and reranking; LangGraph orchestrates the planner, redesign, refine, score, and canvas smart suggestions.
+2. **Normalized design storage**: replace the denormalized `design_versions` JSONB row with `designs`, `design_nodes`, `design_edges`, `node_evidence`, `validation_issues`, and `requirements` tables.
+3. **Authoritative corpus**: everything under `rag_knowledge_base/` (books included) is ingested; collection = top-level folder.
+4. **UI direction**: top-bar navigation; SystemSketcher-style infinite whiteboard canvas with templates; dark and light themes.
+5. **Target hardware**: Ryzen 9 7950X / i9-14900K, 64 GB DDR5, RTX 4090 24 GB, 2 TB NVMe. Embedder/reranker on CPU by default alongside the quantized 32B LLM.
+6. **v1 scope**: single user without sign-in; sketch-to-diagram deferred (needs a vision model).

@@ -11,8 +11,9 @@ Build in vertical slices. Finish and test each phase before starting the next.
 
 ## Phase 1: Knowledge base (week 1–2)
 - Ingest Markdown and PDF first; add DOCX and HTML later.
-- Build heading-aware chunking with collection, source, licence, and date metadata.
+- Build the pipeline with LlamaIndex: heading-aware chunking with collection, source, licence, and date metadata.
 - Embed with bge-m3 and index in Qdrant with dense and sparse vectors.
+- Ingest everything under `rag_knowledge_base/` (collection = top-level folder).
 - Add ingest/search endpoints and filters; make reranker configurable.
 - Seed 20–30 permitted documents across five collections.
 - Done when search returns relevant cited chunks for 10 hand-written questions.
@@ -31,6 +32,7 @@ Build in vertical slices. Finish and test each phase before starting the next.
 
 ## Phase 4: Planner (week 4–5)
 - Add LLM adapter interface and DeepSeek-R1-Distill-Qwen-32B implementation via vLLM or Ollama.
+- Orchestrate the planner as a LangGraph agent.
 - Start with a fixed requirements interview, then add adaptive follow-ups.
 - Prompt with requirements, retrieved evidence, and catalog facts; require `ArchitectureProposal` output.
 - Parse with Pydantic, retry invalid output at most twice, then run validator.
@@ -39,7 +41,7 @@ Build in vertical slices. Finish and test each phase before starting the next.
 
 ## Phase 5: Frontend canvas (week 5–7)
 - Build Vite + React + TypeScript + Tailwind and generate API client from OpenAPI.
-- Implement interview, requirements review, and React Flow canvas.
+- Implement interview, requirements review, and an infinite React Flow whiteboard canvas (SystemSketcher-style palette, toolbar, templates, context menu, AI tools).
 - Add Component, Validation, Evidence, and Cost tabs.
 - Support add/remove/replace component and compatibility-checked connections.
 - Done when users can go from idea to edited, validated diagram in the UI.
@@ -47,10 +49,8 @@ Build in vertical slices. Finish and test each phase before starting the next.
 ## Phase 6: Iterative redesign (week 7–8)
 - Detect nodes affected by a requirement or component change.
 - Re-retrieve and re-plan only that subgraph; show a version diff.
-- Added a versioned redesign endpoint that infers affected nodes from changed requirements or accepts explicit node IDs, then grounds planning in the existing subgraph and its boundaries.
 - Merge the generated subgraph with untouched nodes and edges, validate the complete result, and persist a new immutable design version.
-- The canvas supports focused redesign, NFR edits, and a before/after node, connection, and requirement diff.
-- Done when changing the database or user count updates only relevant parts. ✅
+- Done when changing the database or user count updates only relevant parts.
 
 ## Phase 7: Evaluation and hardening (week 8–9)
 - Build an eval set of 100+ questions and 15+ gold designs with a runner.

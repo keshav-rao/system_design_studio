@@ -1,7 +1,7 @@
 # Technical Requirements
 
 ## System overview
-Knowledge sources flow through extraction, chunking, metadata enrichment, embedding, and indexing. User requirements pass through an interview; the planner receives retrieved evidence and catalog facts, produces a proposal, and hands it to the deterministic validator before the canvas. Canvas edits trigger retrieval and planning for affected areas.
+The corpus is everything under `rag_knowledge_base/`; collection = top-level folder. Knowledge sources flow through extraction, chunking, metadata enrichment, embedding, and indexing. User requirements pass through an interview; the planner receives retrieved evidence and catalog facts, produces a proposal, and hands it to the deterministic validator before the canvas. Canvas edits trigger retrieval and planning for affected areas.
 
 ## Candidate stack
 | Layer | Choice | Notes |
@@ -9,13 +9,14 @@ Knowledge sources flow through extraction, chunking, metadata enrichment, embedd
 | Backend | Python 3.11+, FastAPI, Pydantic v2 | Typed requests, responses, and planner output |
 | Ingestion | PyMuPDF, python-docx, HTML/Markdown parsers | Parser per format |
 | Chunking | Custom Python pipeline | Heading-aware chunks with metadata |
-| Embeddings | BAAI/bge-m3 | Candidate; evaluate on project questions |
+| Embeddings | BAAI/bge-m3 (dense + sparse) | Candidate; evaluate on project questions; never silently fall back to fake vectors |
 | Vector DB | Qdrant | Dense plus sparse hybrid search |
 | Reranker | BAAI/bge-reranker-v2-m3 | Candidate; rerank top 30 to top 6 |
-| Orchestration | LlamaIndex or LangChain | Default LlamaIndex; choose one |
+| RAG pipeline | LlamaIndex | Ingestion, chunking, embedding, hybrid retrieval, reranking |
+| Agent orchestration | LangGraph | Planner, redesign, refine, score, and canvas smart suggestions |
 | LLM | DeepSeek-R1-Distill-Qwen-32B | Serve through vLLM or Ollama adapter |
 | Relational DB | PostgreSQL | Catalog, projects, designs, evaluations |
-| Frontend | React, TypeScript, React Flow, Tailwind | Canvas and side panels |
+| Frontend | React, TypeScript, React Flow, Tailwind, TanStack Query | Infinite whiteboard canvas and side panels |
 | Infra | Docker Compose | API, Qdrant, PostgreSQL, LLM server, web |
 
 All model, embedder, reranker, and vector-store implementations must be swappable through configuration.
@@ -47,13 +48,17 @@ All model, embedder, reranker, and vector-store implementations must be swappabl
 - Real-time features require a connection layer (for example WebSockets) and fan-out strategy.
 
 ## API endpoints
-- `POST /projects`, `GET /projects/{id}`
+All routes are under `/api/v1`.
+- `POST /projects`, `GET /projects`, `GET /projects/{id}`
 - `POST /projects/{id}/interview`
 - `POST /projects/{id}/plan` (streaming supported)
 - `POST /projects/{id}/validate`
-- `PATCH /projects/{id}/design`
-- `GET /catalog/components`, `GET /catalog/components/{id}`
-- `POST /knowledge/ingest`, `POST /knowledge/search`
+- `PATCH /projects/{id}/design` (user edit → new `creator=user` version)
+- `POST /projects/{id}/redesign` (partial re-plan)
+- `GET /projects/{id}/designs`, `GET /projects/{id}/designs/latest`
+- `POST /validator/validate`, `GET /validator/rules`
+- `GET /catalog/components`, `GET /catalog/components/{id}`, `POST /catalog/compatibility/check`
+- `POST /knowledge/ingest`, `POST /knowledge/search`, `GET /knowledge/sources`
 
 ## Evaluation
 Maintain questions and gold designs. Measure retrieval quality, schema validity, validator pass rate, citation correctness, and human ratings. Run evaluations after changes to prompts, chunking, embeddings, or models.

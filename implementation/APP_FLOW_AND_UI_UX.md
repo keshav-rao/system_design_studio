@@ -5,12 +5,12 @@
 2. Requirements interview: ask one question at a time about concurrent users, geography, message volume, privacy/compliance, availability, and budget. Allow skipping with explicitly marked assumptions.
 3. Requirements review: user edits and confirms a summary.
 4. Retrieval and planning: show progress for retrieval, planning, and validation; stream partial results.
-5. Architecture canvas: display the proposal and validation status.
+5. Whiteboard canvas: display the proposal on the infinite canvas with validation status.
 6. Inspect: component panel shows purpose, rationale, citations, assumptions, alternatives, cost units, and failure modes.
-7. Edit: add/remove/replace components, edit connections, or change requirements.
+7. Edit: drag components from the palette, draw shapes/text/freehand annotations, add/remove/replace components (smart drop-downs suggest only catalog-compatible components), edit connections, or change requirements.
 8. Re-plan and validate affected areas; show a diff.
 9. Update capacity and cost estimates.
-10. Export Markdown, PDF, Mermaid, or JSON.
+10. Export PNG, SVG, Markdown, Mermaid, or JSON (PDF post-MVP).
 
 ## Secondary flows
 - Knowledge administration: upload documents, choose collection, set licence/date, ingest, inspect status and chunk previews.
@@ -24,18 +24,23 @@
 - LLM server offline: show service status and retry action.
 
 ## Screen map
-Home → Project list → Interview → Requirements review → Canvas. Canvas side panels: Component, Validation, Evidence, Cost. Settings and Knowledge/Catalog administration live in the sidebar.
+Top bar: Overview, Whiteboard Templates, Compatibility Engine, Catalog, Projects, Knowledge, Settings. Project flow: Projects → Interview → Requirements review → Canvas. Canvas side panels: Component, Validation, Evidence, Cost, AI tools.
 
 ## Layout and interaction
-- Left sidebar around 240px: projects, knowledge base, catalog, evaluations, settings.
-- Center: React Flow canvas with minimap and zoom controls.
-- Right panel around 360px with Component, Validation, Evidence, and Cost tabs.
+Reference: SystemSketcher canvas (https://www.systemsketcher.com/canvas).
+- Top bar (app navigation): brand, Overview, Whiteboard Templates, Compatibility Engine, Catalog, Projects, theme toggle.
+- Canvas header: project name, validation badge, re-plan, export.
+- Left component palette around 240px (collapsible): search plus collapsible categories from the catalog; drag onto the canvas.
+- Center: infinite React Flow canvas (pan/zoom without bounds) with grid toggle, minimap, and zoom controls.
+- Floating canvas toolbar: select/pan, rectangle, ellipse, arrow, elbow connector, text, freehand, bring forward/back, lock, undo/redo, delete, eraser, templates library, export.
+- Right-click context menu: duplicate, replace, delete, lock, explain with AI.
+- Right panel around 360px with Component, Validation, Evidence, Cost, and AI tools tabs (Generate from description, Refine selection, Score design).
 - Bottom drawer: architect chat and requirement chips.
-- Top bar: project name, validation badge, re-plan, export.
 - Canvas layers: Clients, Edge, Services, Data stores, Async, Observability.
 - Nodes use layer colors and validation borders; edges show HTTPS, WebSocket, or async protocol labels.
 - Reject invalid connections with a tooltip describing the compatibility rule.
 - Highlight changed nodes after re-planning and show a diff.
+- Whiteboard templates (e.g. e-commerce, real-time streaming, AI/RAG) load onto the canvas in one click.
 
 ## Key components
 - RequirementChip: editable value with an assumed badge when defaulted.
@@ -46,7 +51,7 @@ Home → Project list → Interview → Requirements review → Canvas. Canvas s
 
 ## Visual and accessibility principles
 - Calm, technical developer-tool interface; evidence is visible and the canvas is primary.
-- Dark and light themes, defaulting to system. Use neutral greys, one accent, and semantic green/amber/red.
+- Dark and light themes with a top-bar toggle, defaulting to system. Use neutral greys, one accent, and semantic green/amber/red.
 - Use an 8px spacing grid, restrained borders, and 8–12px radii.
 - Keyboard navigation and visible focus rings throughout, including the canvas.
 - Never rely on color alone for validation; pair color with icons and labels.

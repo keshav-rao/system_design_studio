@@ -7,6 +7,8 @@
 - **Framework**: FastAPI with Pydantic v2 & `pydantic-settings`
 - **Database**: PostgreSQL 16 with async SQLAlchemy and Alembic migrations
 - **Vector DB**: Qdrant (dense + sparse vectors)
+- **RAG pipeline**: LlamaIndex
+- **Agent orchestration**: LangGraph
 - **Embedding & Reranking**: BAAI/bge-m3, BAAI/bge-reranker-v2-m3
 - **LLM Adapter**: DeepSeek-R1-Distill-Qwen-32B via vLLM / Ollama
 

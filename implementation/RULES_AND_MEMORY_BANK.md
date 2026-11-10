@@ -36,7 +36,7 @@
 - Update tests with each change: unit tests for rules/services, API integration tests, and a few core-flow E2E tests.
 - Each validator rule needs a passing and failing test.
 - Check retrieval changes against the eval set; never delete or weaken tests to pass.
-- Ingest only sources with recorded licence or permission; no unauthorized copyrighted books.
+- Everything under `rag_knowledge_base/` (including books) is the authoritative corpus and is ingested; record provenance and licence/permission notes per source.
 - Date every source; refresh time-sensitive pricing, limits, and region facts.
 
 ## Git and safety
@@ -58,7 +58,7 @@
 Generic chatbots are unsourced and unchecked. UX prioritizes evidence on every claim, an editable canvas, and visible validation. Example: dating app with profiles, matching, image uploads, and real-time chat.
 
 ### techContext
-FastAPI, Pydantic v2, PostgreSQL, Qdrant, bge-m3, bge-reranker-v2-m3, LlamaIndex, DeepSeek-R1-Distill-Qwen-32B, React, TypeScript, React Flow, Docker Compose. Candidate models remain provisional until evaluated. The system runs locally, with model/embedder/reranker swappable by configuration.
+FastAPI, Pydantic v2, PostgreSQL, Qdrant, bge-m3, bge-reranker-v2-m3, LlamaIndex (RAG pipeline), LangGraph (agent orchestration), DeepSeek-R1-Distill-Qwen-32B, React, TypeScript, React Flow, TanStack Query, Docker Compose. Candidate models remain provisional until evaluated. The system runs locally, with model/embedder/reranker swappable by configuration.
 
 ### systemPatterns
 Pipeline: ingest → chunk → metadata → embed → index → hybrid retrieve → rerank → plan → validate → canvas. Validate planner output against schema and retry at most twice. Catalog owns component compatibility and limits. Designs are append-only; partial re-plan touches affected nodes. Layering: router → service → repository, with adapters for external/model services.
@@ -70,7 +70,7 @@ Current task: set up repo and Docker Compose
 Last completed: nothing yet
 In progress: —
 Next up: FastAPI skeleton and health endpoint
-Open questions: LlamaIndex vs LangChain (default LlamaIndex); vLLM vs Ollama
+Open questions: vLLM vs Ollama
 Blockers: none
 ```
 
@@ -93,7 +93,7 @@ Blockers: none
 - RAG before fine-tuning: knowledge changes and needs citations; fine-tune only after failure analysis.
 - Structured catalog alongside vector search: improves control and provides hard facts for validation.
 - Deterministic validator: model output is never trusted without checks.
-- Choose one orchestration framework to avoid complexity (default LlamaIndex).
+- LlamaIndex owns the RAG pipeline; LangGraph owns agent orchestration (planner, redesign, refine, score). Do not mix responsibilities.
 - Treat embedder and reranker as candidates; evaluate on project questions.
 
 ### evalNotes
