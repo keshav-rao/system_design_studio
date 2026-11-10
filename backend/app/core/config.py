@@ -47,15 +47,26 @@ class Settings(BaseSettings):
     # Qdrant Vector DB
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_GRPC_PORT: int = 6334
-    QDRANT_COLLECTION: str = "knowledge_chunks"
+    QDRANT_COLLECTION: str = "knowledge_chunks_bge_m3"
     QDRANT_LOCAL_PATH: str = "./qdrant_storage"
 
     # Embedding & Reranker
-    EMBEDDING_PROVIDER: str = "fastembed"
+    # "bge-m3" (dense + sparse from one model), "fastembed", or "hash" (offline/tests)
+    EMBEDDING_PROVIDER: str = "bge-m3"
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     SPARSE_EMBEDDING_MODEL: str = "Qdrant/bm25"
+    EMBEDDING_DEVICE: str | None = None  # None = cuda if available, else cpu
+    EMBEDDING_BATCH_SIZE: int = 16
+    EMBEDDING_MAX_LENGTH: int = 1024
     RERANKER_ENABLED: bool = True
+    # "cross-encoder" (LlamaIndex SentenceTransformerRerank) or "lexical"
+    RERANKER_PROVIDER: str = "cross-encoder"
     RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
+
+    # RAG corpus (everything under rag_knowledge_base/ is authoritative)
+    RAG_CORPUS_PATH: str = "../rag_knowledge_base"
+    RAG_CHUNK_SIZE: int = 512
+    RAG_CHUNK_OVERLAP: int = 64
 
     # Data paths
     DATA_DIR: str = "./data"

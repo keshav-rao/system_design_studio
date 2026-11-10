@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,13 +16,13 @@ from app.schemas.knowledge import (
     SearchResponse,
     SourceResponse,
 )
-from app.services.knowledge.ingestion.chunker import HeadingAwareChunker
+from app.services.knowledge.ingestion.corpus_loader import iter_corpus_documents
+from app.services.knowledge.ingestion.llama_chunker import LlamaIndexChunker
 from app.services.knowledge.interfaces.embedder import BaseEmbedder
 from app.services.knowledge.interfaces.reranker import BaseReranker
 from app.services.knowledge.interfaces.vector_store import BaseVectorStore
-from app.services.knowledge.providers.hybrid_embedder import HybridEmbedder
+from app.services.knowledge.providers.factory import build_embedder, build_reranker
 from app.services.knowledge.providers.qdrant_store import QdrantVectorStore
-from app.services.knowledge.providers.reranker import ConfigurableReranker
 
 logger = logging.getLogger(__name__)
 
@@ -37,24 +38,37 @@ class KnowledgeService:
         vector_store: BaseVectorStore | None = None,
         embedder: BaseEmbedder | None = None,
         reranker: BaseReranker | None = None,
-        chunker: HeadingAwareChunker | None = None,
+        chunker: LlamaIndexChunker | None = None,
     ):
-        self.chunker = chunker or HeadingAwareChunker()
-        self.embedder = embedder or HybridEmbedder(
-            dense_model_name=settings.EMBEDDING_MODEL,
-            sparse_model_name=settings.SPARSE_EMBEDDING_MODEL,
-            prefer_fastembed=settings.EMBEDDING_PROVIDER == "fastembed",
+        self.chunker = chunker or LlamaIndexChunker(
+            chunk_size=settings.RAG_CHUNK_SIZE,
+            chunk_overlap=settings.RAG_CHUNK_OVERLAP,
         )
+        self.embedder = embedder or build_embedder()
         self.vector_store = vector_store or QdrantVectorStore(
             collection_name=settings.QDRANT_COLLECTION,
             dense_dim=self.embedder.dense_dimension,
             url=settings.QDRANT_URL,
             local_path=settings.QDRANT_LOCAL_PATH,
         )
-        self.reranker = reranker or ConfigurableReranker(
-            enabled=settings.RERANKER_ENABLED,
-            model_name=settings.RERANKER_MODEL,
-        )
+        self.reranker = reranker or build_reranker()
+
+    async def _embed_and_index(self, chunks: list, batch_size: int = 64) -> int:
+        """Embed chunks in batches (dense + sparse) and upsert them into Qdrant."""
+        for start in range(0, len(chunks), batch_size):
+            batch = chunks[start : start + batch_size]
+            texts = [f"{c.title}\n{c.section_path}\n{c.text}" for c in batch]
+            dense_vecs, sparse_idxs, sparse_vals = await self.embedder.embed_documents(
+                texts
+            )
+            for chunk, d_vec, s_idx, s_val in zip(
+                batch, dense_vecs, sparse_idxs, sparse_vals, strict=True
+            ):
+                chunk.dense_vector = d_vec
+                chunk.sparse_indices = s_idx
+                chunk.sparse_values = s_val
+            await self.vector_store.upsert_chunks(batch)
+        return len(chunks)
 
     async def ingest_document(
         self, request: KnowledgeIngestRequest, db: AsyncSession
@@ -88,22 +102,7 @@ class KnowledgeService:
         )
 
         if chunks:
-            # Batch embedding
-            chunk_texts = [f"{c.title}\n{c.section_path}\n{c.text}" for c in chunks]
-            dense_vecs, sparse_idxs, sparse_vals = await self.embedder.embed_documents(
-                chunk_texts
-            )
-
-            for chunk, d_vec, s_idx, s_val in zip(
-                chunks, dense_vecs, sparse_idxs, sparse_vals, strict=False
-            ):
-                chunk.dense_vector = d_vec
-                chunk.sparse_indices = s_idx
-                chunk.sparse_values = s_val
-
-            # Index into Qdrant
-            await self.vector_store.upsert_chunks(chunks)
-            source.chunk_count = len(chunks)
+            source.chunk_count = await self._embed_and_index(chunks)
 
         await db.commit()
         await db.refresh(source)
@@ -214,6 +213,61 @@ class KnowledgeService:
         logger.info("Successfully seeded %d knowledge documents.", seeded_count)
         return seeded_count
 
+    async def ingest_corpus(
+        self,
+        db: AsyncSession,
+        root: Path | None = None,
+        collections: list[str] | None = None,
+        limit: int | None = None,
+    ) -> dict[str, int]:
+        """
+        Ingest every supported file under the RAG corpus (rag_knowledge_base/).
+        Idempotent: unchanged files (same content hash) are skipped and changed
+        files are re-chunked and re-indexed.
+        """
+        root = root or Path(settings.RAG_CORPUS_PATH)
+        if not root.is_dir():
+            raise FileNotFoundError(f"RAG corpus not found at {root.resolve()}")
+
+        stats = {"ingested": 0, "updated": 0, "skipped": 0, "chunks": 0}
+        for doc in iter_corpus_documents(root, collections):
+            if limit is not None and stats["ingested"] + stats["updated"] >= limit:
+                break
+            source = await db.get(Source, doc.source_id)
+            if source is not None and source.version == doc.content_hash:
+                stats["skipped"] += 1
+                continue
+            if source is not None:
+                await self.vector_store.delete_by_source(str(doc.source_id))
+                stats["updated"] += 1
+            else:
+                source = Source(id=doc.source_id)
+                db.add(source)
+                stats["ingested"] += 1
+
+            source.title = doc.title
+            source.collection = doc.collection
+            source.origin_url = doc.origin_url or f"corpus://{doc.rel_path}"
+            source.licence = doc.licence
+            source.publication_date = doc.publication_date
+            source.version = doc.content_hash
+            source.permission_notes = f"rag_knowledge_base/{doc.rel_path}"
+
+            chunks = self.chunker.chunk_markdown(
+                content=doc.text,
+                source_id=str(doc.source_id),
+                title=doc.title,
+                collection=doc.collection,
+                licence=doc.licence,
+                publication_date=doc.publication_date,
+                tags=doc.tags,
+            )
+            source.chunk_count = await self._embed_and_index(chunks)
+            stats["chunks"] += source.chunk_count
+            await db.commit()
+            logger.info("Indexed %s (%d chunks)", doc.rel_path, source.chunk_count)
+        return stats
+
     async def run_evaluation(self, db: AsyncSession) -> EvalRunResult:
         """
         Runs evaluation on 10 hand-written benchmark questions.
@@ -285,6 +339,7 @@ class KnowledgeService:
         # Record in eval_runs table
         eval_run = EvalRun(
             config={
+                "embedding_provider": type(self.embedder).__name__,
                 "embedding_model": settings.EMBEDDING_MODEL,
                 "sparse_model": settings.SPARSE_EMBEDDING_MODEL,
                 "reranker": settings.RERANKER_MODEL,

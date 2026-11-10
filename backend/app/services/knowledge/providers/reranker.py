@@ -1,5 +1,8 @@
 import logging
 import re
+from typing import Any
+
+from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
 
 from app.core.config import settings
 from app.schemas.knowledge import SearchResult
@@ -10,66 +13,73 @@ logger = logging.getLogger(__name__)
 
 class ConfigurableReranker(BaseReranker):
     """
-    Configurable reranker that combines cross-encoder re-scoring (if enabled)
-    with query-title-section alignment boosting.
+    Reranks hybrid-retrieval candidates.
+    provider="cross-encoder" uses LlamaIndex's SentenceTransformerRerank with
+    the configured model (BAAI/bge-reranker-v2-m3); load failures raise.
+    provider="lexical" uses query/title/section alignment (offline and tests).
     """
 
     def __init__(
         self,
         enabled: bool = settings.RERANKER_ENABLED,
         model_name: str = settings.RERANKER_MODEL,
+        provider: str = "lexical",
+        postprocessor: Any | None = None,
     ):
         self.enabled = enabled
         self.model_name = model_name
-        self._cross_encoder = None
-        self._initialized = False
+        self.provider = provider
+        self._postprocessor = postprocessor
 
-    def _init_cross_encoder(self) -> None:
-        if self._initialized:
-            return
-        if self.enabled:
-            try:
-                # FastEmbed text reranker if available
-                from fastembed import TextCrossEncoder  # type: ignore[attr-defined]
+    def _cross_encoder(self, top_n: int) -> Any:
+        if self._postprocessor is None:
+            from llama_index.core.postprocessor import SentenceTransformerRerank
 
-                logger.info("Initializing Cross-Encoder model (%s)...", self.model_name)
-                self._cross_encoder = TextCrossEncoder(model_name=self.model_name)
-            except Exception as e:
-                logger.debug(
-                    "Cross-encoder not loaded (%s), using lexical alignment reranking",
-                    e,
-                )
-                self._cross_encoder = None
-        self._initialized = True
+            logger.info("Loading cross-encoder reranker (%s)", self.model_name)
+            self._postprocessor = SentenceTransformerRerank(
+                model=self.model_name, top_n=top_n
+            )
+        self._postprocessor.top_n = top_n
+        return self._postprocessor
 
     async def rerank(
         self, query: str, candidates: list[SearchResult], top_k: int
     ) -> list[SearchResult]:
         if not candidates:
             return []
-
         if not self.enabled:
             return candidates[:top_k]
+        if self.provider == "cross-encoder":
+            return self._rerank_cross_encoder(query, candidates, top_k)
+        return self._rerank_lexical(query, candidates, top_k)
 
-        self._init_cross_encoder()
+    def _rerank_cross_encoder(
+        self, query: str, candidates: list[SearchResult], top_k: int
+    ) -> list[SearchResult]:
+        by_id = {c.chunk_id: c for c in candidates}
+        nodes = [
+            NodeWithScore(
+                node=TextNode(
+                    id_=c.chunk_id, text=f"{c.title} - {c.section_path}: {c.text}"
+                ),
+                score=c.score,
+            )
+            for c in candidates
+        ]
+        ranked = self._cross_encoder(top_k).postprocess_nodes(
+            nodes, query_bundle=QueryBundle(query)
+        )
+        results: list[SearchResult] = []
+        for n in ranked:
+            result = by_id[n.node.node_id].model_copy()
+            result.score = float(n.score or 0.0)
+            results.append(result)
+        return results
 
-        # Try cross-encoder first
-        if self._cross_encoder is not None:
-            try:
-                doc_texts = [
-                    f"{c.title} - {c.section_path}: {c.text}" for c in candidates
-                ]
-                scores = list(self._cross_encoder.rerank(query, doc_texts))
-                for c, s in zip(candidates, scores, strict=False):
-                    c.score = float(s)
-                candidates.sort(key=lambda x: x.score, reverse=True)
-                return candidates[:top_k]
-            except Exception as e:
-                logger.debug(
-                    "Cross encoder execution failed (%s), fallback to alignment", e
-                )
-
-        # Lexical + hierarchy alignment boosting
+    @staticmethod
+    def _rerank_lexical(
+        query: str, candidates: list[SearchResult], top_k: int
+    ) -> list[SearchResult]:
         query_terms = [
             t.lower() for t in re.findall(r"\b[a-zA-Z0-9_\-\.]+\b", query) if len(t) > 2
         ]
@@ -90,7 +100,6 @@ class ConfigurableReranker(BaseReranker):
                 if term in text_lower:
                     boost += 0.10
 
-            # Blend existing RRF score with alignment boost
             candidate.score = round(candidate.score * 0.5 + boost * 0.5, 4)
 
         candidates.sort(key=lambda x: x.score, reverse=True)
