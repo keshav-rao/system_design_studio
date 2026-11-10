@@ -58,6 +58,23 @@ class DesignNode(BaseModel):
         default_factory=dict,
         description="User-specified configuration overrides",
     )
+    label: str | None = Field(default=None, description="Display label")
+    rationale: str | None = Field(
+        default=None, description="Why this component was chosen"
+    )
+    evidence_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of EvidenceLink items supporting this component",
+    )
+    assumptions: list[str] = Field(
+        default_factory=list, description="Assumptions behind this component"
+    )
+    alternatives: list[str] = Field(
+        default_factory=list, description="Catalog slugs of alternatives considered"
+    )
+    position: dict[str, float] | None = Field(
+        default=None, description="Canvas position {x, y}"
+    )
 
 
 class DesignEdge(BaseModel):

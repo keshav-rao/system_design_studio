@@ -17,6 +17,12 @@ export interface DesignNode {
   protocols: string[]
   limits: Record<string, any>
   config: Record<string, any>
+  label?: string | null
+  rationale?: string | null
+  evidence_ids?: string[]
+  assumptions?: string[]
+  alternatives?: string[]
+  position?: { x: number; y: number } | null
 }
 
 export interface DesignEdge {
@@ -49,6 +55,8 @@ export interface ValidationResult {
 }
 
 export interface EvidenceLink {
+  id?: string | null
+  chunk_id?: string | null
   source_id?: string | null
   source_title: string
   collection: string
@@ -100,6 +108,7 @@ export interface ProjectResponse {
   description?: string | null
   created_at: string
   updated_at: string
+  status?: 'interviewing' | 'planning' | 'designed'
   versions_count: number
 }
 
@@ -131,6 +140,9 @@ export interface DesignVersionResponse {
   id: string
   project_id: string
   version_number: number
+  parent_version?: number | null
+  creator?: 'planner' | 'user'
+  validation_status?: 'valid' | 'warnings' | 'errors'
   title: string
   summary: string
   requirements: DesignRequirements
@@ -139,6 +151,8 @@ export interface DesignVersionResponse {
   assumptions: string[]
   evidence_links: EvidenceLink[]
   alternatives_considered: AlternativeConsidered[]
+  unaddressed_requirements?: string[]
+  open_questions?: string[]
   validation_issues: ValidationIssue[]
   is_valid: boolean
   created_at: string

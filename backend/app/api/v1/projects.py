@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.models.project import Project
+from app.repositories import ProjectRepository
 from app.schemas.planner import (
     DesignVersionResponse,
     InterviewRequest,
@@ -34,6 +36,17 @@ def get_planner_service(
     )
 
 
+def _project_response(project: Project, versions_count: int) -> ProjectResponse:
+    return ProjectResponse(
+        id=project.id,
+        name=project.name,
+        description=project.description,
+        status=project.status,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        versions_count=versions_count,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Project Lifecycle Endpoints
@@ -52,14 +65,7 @@ async def create_project(
     planner_service: PlannerService = Depends(get_planner_service),
 ) -> ProjectResponse:
     project = await planner_service.create_project(req, db)
-    return ProjectResponse(
-        id=project.id,
-        name=project.name,
-        description=project.description,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-        versions_count=0,
-    )
+    return _project_response(project, 0)
 
 
 @router.get(
@@ -73,18 +79,8 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
     planner_service: PlannerService = Depends(get_planner_service),
 ) -> list[ProjectResponse]:
-    projects = await planner_service.list_projects(db, limit=limit, offset=offset)
-    return [
-        ProjectResponse(
-            id=p.id,
-            name=p.name,
-            description=p.description,
-            created_at=p.created_at,
-            updated_at=p.updated_at,
-            versions_count=len(p.design_versions) if p.design_versions else 0,
-        )
-        for p in projects
-    ]
+    rows = await planner_service.list_projects(db, limit=limit, offset=offset)
+    return [_project_response(p, count) for p, count in rows]
 
 
 @router.get(
@@ -103,14 +99,8 @@ async def get_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID '{project_id}' not found.",
         )
-    return ProjectResponse(
-        id=project.id,
-        name=project.name,
-        description=project.description,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-        versions_count=len(project.design_versions) if project.design_versions else 0,
-    )
+    count = await ProjectRepository(db).count_versions(project_id)
+    return _project_response(project, count)
 
 
 # ---------------------------------------------------------------------------
@@ -148,23 +138,7 @@ async def generate_plan(
     planner_service: PlannerService = Depends(get_planner_service),
 ) -> DesignVersionResponse:
     try:
-        version = await planner_service.generate_plan(project_id, req, db)
-        return DesignVersionResponse(
-            id=version.id,
-            project_id=version.project_id,
-            version_number=version.version_number,
-            title=version.title,
-            summary=version.summary,
-            requirements=version.requirements,
-            nodes=version.nodes,
-            edges=version.edges,
-            assumptions=version.assumptions,
-            evidence_links=version.evidence_links,
-            alternatives_considered=version.alternatives_considered,
-            validation_issues=version.validation_issues,
-            is_valid=version.is_valid,
-            created_at=version.created_at,
-        )
+        return await planner_service.generate_plan(project_id, req, db)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
@@ -205,24 +179,7 @@ async def redesign(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Architecture redesign failed: {e}",
         ) from e
-    return DesignVersionResponse(
-        id=version.id,
-        project_id=version.project_id,
-        version_number=version.version_number,
-        title=version.title,
-        summary=version.summary,
-        requirements=version.requirements,
-        nodes=version.nodes,
-        edges=version.edges,
-        assumptions=version.assumptions,
-        evidence_links=version.evidence_links,
-        alternatives_considered=version.alternatives_considered,
-        validation_issues=version.validation_issues,
-        is_valid=version.is_valid,
-        created_at=version.created_at,
-        affected_node_ids=affected_node_ids,
-    )
-
+    return version
 
 
 @router.get(
@@ -235,26 +192,7 @@ async def list_design_versions(
     db: AsyncSession = Depends(get_db),
     planner_service: PlannerService = Depends(get_planner_service),
 ) -> list[DesignVersionResponse]:
-    versions = await planner_service.list_design_versions(project_id, db)
-    return [
-        DesignVersionResponse(
-            id=v.id,
-            project_id=v.project_id,
-            version_number=v.version_number,
-            title=v.title,
-            summary=v.summary,
-            requirements=v.requirements,
-            nodes=v.nodes,
-            edges=v.edges,
-            assumptions=v.assumptions,
-            evidence_links=v.evidence_links,
-            alternatives_considered=v.alternatives_considered,
-            validation_issues=v.validation_issues,
-            is_valid=v.is_valid,
-            created_at=v.created_at,
-        )
-        for v in versions
-    ]
+    return await planner_service.list_design_versions(project_id, db)
 
 
 @router.get(
@@ -273,19 +211,4 @@ async def get_latest_design_version(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No design versions found for project '{project_id}'.",
         )
-    return DesignVersionResponse(
-        id=v.id,
-        project_id=v.project_id,
-        version_number=v.version_number,
-        title=v.title,
-        summary=v.summary,
-        requirements=v.requirements,
-        nodes=v.nodes,
-        edges=v.edges,
-        assumptions=v.assumptions,
-        evidence_links=v.evidence_links,
-        alternatives_considered=v.alternatives_considered,
-        validation_issues=v.validation_issues,
-        is_valid=v.is_valid,
-        created_at=v.created_at,
-    )
+    return v
