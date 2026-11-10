@@ -34,7 +34,6 @@ def get_planner_service(
     )
 
 
-
 # ---------------------------------------------------------------------------
 # Project Lifecycle Endpoints
 # ---------------------------------------------------------------------------
@@ -166,9 +165,7 @@ async def generate_plan(
             created_at=version.created_at,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        ) from e
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -189,13 +186,9 @@ async def redesign(
     planner_service: PlannerService = Depends(get_planner_service),
 ) -> DesignVersionResponse:
     try:
-        version, affected_node_ids = await planner_service.redesign(
-            project_id, req, db
-        )
+        version, affected_node_ids = await planner_service.redesign(project_id, req, db)
     except LookupError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        ) from e
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
@@ -222,7 +215,6 @@ async def redesign(
         created_at=version.created_at,
         affected_node_ids=affected_node_ids,
     )
-
 
 
 @router.get(

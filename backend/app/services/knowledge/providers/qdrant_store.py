@@ -67,7 +67,9 @@ class QdrantVectorStore(BaseVectorStore):
         except Exception:
             exists = False
 
-        if not exists:
+        if exists:
+            self._check_dimension()
+        else:
             logger.info("Creating Qdrant collection: %s", self.collection_name)
             self.client.create_collection(
                 collection_name=self.collection_name,
@@ -90,6 +92,22 @@ class QdrantVectorStore(BaseVectorStore):
                     )
                 except Exception as e:
                     logger.debug("Payload index creation note: %s", e)
+
+    def _check_dimension(self) -> None:
+        vectors = self.client.get_collection(self.collection_name).config.params.vectors
+        dense = vectors.get("dense") if isinstance(vectors, dict) else None
+        if dense is not None and dense.size != self.dense_dim:
+            raise RuntimeError(
+                f"Qdrant collection '{self.collection_name}' has dense size "
+                f"{dense.size}, but the embedder produces {self.dense_dim}. "
+                "Re-run corpus ingestion with --recreate."
+            )
+
+    async def recreate(self) -> None:
+        """Drop and recreate the collection (e.g. after an embedding model change)."""
+        if self.client.collection_exists(self.collection_name):
+            self.client.delete_collection(self.collection_name)
+        await self.initialize()
 
     async def upsert_chunks(self, chunks: list[KnowledgeChunk]) -> int:
         if not chunks:

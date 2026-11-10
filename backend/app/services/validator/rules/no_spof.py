@@ -15,13 +15,15 @@ from app.schemas.validator import (
 RULE_ID = "no-spof"
 
 # Categories where a single replica is dangerous
-_DATA_CATEGORIES = frozenset({
-    "database",
-    "cache",
-    "queue",
-    "streaming",
-    "storage",
-})
+_DATA_CATEGORIES = frozenset(
+    {
+        "database",
+        "cache",
+        "queue",
+        "streaming",
+        "storage",
+    }
+)
 
 
 def validate(design: DesignDocument) -> list[ValidationIssue]:

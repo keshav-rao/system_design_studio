@@ -12,4 +12,3 @@ api_router.include_router(knowledge_router)
 api_router.include_router(catalog_router)
 api_router.include_router(validator_router)
 api_router.include_router(projects_router)
-

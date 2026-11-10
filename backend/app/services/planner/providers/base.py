@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 class BaseLLMAdapter(ABC):
     """Abstract interface for LLM providers (DeepSeek-R1-Distill-Qwen-32B)."""
 
-
     @abstractmethod
     async def generate(
         self,

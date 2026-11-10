@@ -23,8 +23,9 @@ def _tokenize(text: str) -> list[str]:
 class HybridEmbedder(BaseEmbedder):
     """
     Hybrid embedder producing dense vectors and sparse token-weight vectors.
-    Uses FastEmbed (ONNX) when available, and provides deterministic fallback
-    for offline environments and fast unit testing.
+    Uses FastEmbed (ONNX) when prefer_fastembed is set; otherwise produces
+    deterministic hashed vectors for offline environments and unit tests.
+    With strict=True, FastEmbed failures raise instead of degrading silently.
     """
 
     def __init__(
@@ -33,11 +34,13 @@ class HybridEmbedder(BaseEmbedder):
         sparse_model_name: str = "Qdrant/bm25",
         dense_dim: int = 384,
         prefer_fastembed: bool = True,
+        strict: bool = False,
     ):
         self._dense_model_name = dense_model_name
         self._sparse_model_name = sparse_model_name
         self._dense_dim = dense_dim
         self._prefer_fastembed = prefer_fastembed
+        self._strict = strict
         self._dense_model: object | None = None
         self._sparse_model: object | None = None
         self._initialized = False
@@ -66,6 +69,10 @@ class HybridEmbedder(BaseEmbedder):
                 )
                 logger.info("FastEmbed hybrid models successfully initialized.")
             except Exception as e:
+                if self._strict:
+                    raise RuntimeError(
+                        f"FastEmbed could not load {self._dense_model_name}: {e}"
+                    ) from e
                 logger.warning(
                     "FastEmbed initialization failed (%s). "
                     "Falling back to deterministic hybrid embedder.",
@@ -127,6 +134,8 @@ class HybridEmbedder(BaseEmbedder):
                 sparse_res = next(sparse_gen)
                 return dense, list(sparse_res.indices), list(sparse_res.values)
             except Exception as e:
+                if self._strict:
+                    raise
                 logger.warning(
                     "FastEmbed query embedding failed (%s), using fallback.", e
                 )
@@ -151,6 +160,8 @@ class HybridEmbedder(BaseEmbedder):
                     sparse_val_list.append(list(s.values))
                 return dense_list, sparse_idx_list, sparse_val_list
             except Exception as e:
+                if self._strict:
+                    raise
                 logger.warning(
                     "FastEmbed doc batch embedding failed (%s), using fallback.", e
                 )

@@ -26,9 +26,7 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
     if reqs.expected_qps is None or reqs.expected_qps < _WRITE_QPS_THRESHOLD:
         return issues
 
-    has_async = any(
-        n.category.lower() in _ASYNC_CATEGORIES for n in design.nodes
-    )
+    has_async = any(n.category.lower() in _ASYNC_CATEGORIES for n in design.nodes)
 
     if not has_async:
         issues.append(

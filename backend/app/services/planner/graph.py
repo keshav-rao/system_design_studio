@@ -181,9 +181,7 @@ class ArchitecturePlannerGraph:
             )
 
         prompt = "\n".join(prompt_lines)
-        raw_output = await self.llm.generate(
-            prompt=prompt, system_prompt=system_prompt
-        )
+        raw_output = await self.llm.generate(prompt=prompt, system_prompt=system_prompt)
 
         return {"raw_llm_output": raw_output}
 

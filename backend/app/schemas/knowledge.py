@@ -1,11 +1,13 @@
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
-CollectionType = Literal[
-    "foundations", "patterns", "cloud_docs", "capacity", "case_studies"
+# A collection is the top-level folder of the RAG corpus (e.g. "01_fundamentals")
+# or one of the legacy seed collections ("foundations", "patterns", ...).
+CollectionType = Annotated[
+    str, StringConstraints(min_length=1, max_length=100, pattern=r"^[\w.\-]+$")
 ]
 
 

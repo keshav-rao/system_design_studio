@@ -251,8 +251,7 @@ class PlannerService:
         if not seeds.issubset(proposed_ids):
             missing_ids = sorted(seeds - proposed_ids)
             raise RuntimeError(
-                "Planner did not preserve affected node IDs: "
-                + ", ".join(missing_ids)
+                "Planner did not preserve affected node IDs: " + ", ".join(missing_ids)
             )
 
         merged_node_ids = set(nodes_by_id) | {
@@ -262,14 +261,8 @@ class PlannerService:
             or (
                 node.id not in nodes_by_id
                 and any(
-                    (
-                        edge["source_id"] == node.id
-                        and edge["target_id"] in seeds
-                    )
-                    or (
-                        edge["target_id"] == node.id
-                        and edge["source_id"] in seeds
-                    )
+                    (edge["source_id"] == node.id and edge["target_id"] in seeds)
+                    or (edge["target_id"] == node.id and edge["source_id"] in seeds)
                     for edge in proposed_edges
                 )
             )
@@ -277,9 +270,7 @@ class PlannerService:
         new_nodes = [
             node
             for node in proposed_nodes
-            if (
-                node.id in merged_node_ids and node.id not in nodes_by_id
-            )
+            if (node.id in merged_node_ids and node.id not in nodes_by_id)
             or node.id in seeds
         ]
         merged_nodes = [

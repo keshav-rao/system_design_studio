@@ -5,13 +5,16 @@ import pypdf
 
 from app.schemas.knowledge import CollectionType, KnowledgeChunk
 from app.services.knowledge.ingestion.chunker import HeadingAwareChunker
+from app.services.knowledge.ingestion.llama_chunker import LlamaIndexChunker
 
 
 class PDFParser:
     """Extracts text and page numbers from PDF documents and chunks them."""
 
-    def __init__(self, chunker: HeadingAwareChunker | None = None):
-        self.chunker = chunker or HeadingAwareChunker()
+    def __init__(self, chunker: HeadingAwareChunker | LlamaIndexChunker | None = None):
+        self.chunker: HeadingAwareChunker | LlamaIndexChunker = (
+            chunker or HeadingAwareChunker()
+        )
 
     def parse_pdf(
         self,

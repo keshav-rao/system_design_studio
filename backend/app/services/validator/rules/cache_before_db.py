@@ -23,12 +23,8 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
 
     reqs = design.requirements
     high_traffic = (
-        (reqs.expected_qps is not None and reqs.expected_qps >= _QPS_THRESHOLD)
-        or (
-            reqs.expected_users is not None
-            and reqs.expected_users >= _USERS_THRESHOLD
-        )
-    )
+        reqs.expected_qps is not None and reqs.expected_qps >= _QPS_THRESHOLD
+    ) or (reqs.expected_users is not None and reqs.expected_users >= _USERS_THRESHOLD)
 
     if not high_traffic:
         return issues
@@ -37,9 +33,7 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
     has_cache = any(n.category.lower() == "cache" for n in design.nodes)
 
     if has_db and not has_cache:
-        db_ids = [
-            n.id for n in design.nodes if n.category.lower() == "database"
-        ]
+        db_ids = [n.id for n in design.nodes if n.category.lower() == "database"]
         issues.append(
             ValidationIssue(
                 rule_id=RULE_ID,

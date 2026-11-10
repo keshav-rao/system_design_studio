@@ -23,9 +23,7 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
     if not design.requirements.data_durability_required:
         return issues
 
-    has_store = any(
-        n.category.lower() in _DURABLE_CATEGORIES for n in design.nodes
-    )
+    has_store = any(n.category.lower() in _DURABLE_CATEGORIES for n in design.nodes)
 
     if not has_store:
         issues.append(

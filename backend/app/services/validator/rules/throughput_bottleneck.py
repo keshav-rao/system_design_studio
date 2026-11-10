@@ -54,7 +54,7 @@ def validate(design: DesignDocument) -> list[ValidationIssue]:
                         f"Throughput bottleneck: '{tgt.slug}' "
                         f"({tgt_val:,} QPS) is significantly lower than "
                         f"upstream '{src.slug}' ({src_val:,} QPS). "
-                        f"Ratio {tgt_val/src_val:.0%} < {_BOTTLENECK_RATIO:.0%}."
+                        f"Ratio {tgt_val / src_val:.0%} < {_BOTTLENECK_RATIO:.0%}."
                     ),
                     node_ids=[src.id, tgt.id],
                     edge_ids=[f"{edge.source_id}->{edge.target_id}"],
