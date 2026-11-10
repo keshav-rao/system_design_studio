@@ -241,6 +241,7 @@ class KnowledgeService:
         stats = {"ingested": 0, "updated": 0, "skipped": 0, "deleted": 0, "chunks": 0}
         seen: set[uuid.UUID] = set()
         complete_scan = True
+        run_id = uuid.uuid4().hex[:12]
         for doc in iter_corpus_documents(root, collections):
             seen.add(doc.source_id)
             if limit is not None and stats["ingested"] + stats["updated"] >= limit:
@@ -260,10 +261,10 @@ class KnowledgeService:
                 publication_date=doc.publication_date,
                 tags=doc.tags,
             )
-            # Version chunk IDs so new points never overwrite the old ones; old
-            # points are removed only after the replacement is fully indexed.
+            # Run-scoped chunk IDs: new points never overwrite old ones (or those
+            # of a concurrent run); old points go only after full indexing.
             for i, chunk in enumerate(chunks, start=1):
-                chunk.id = f"{doc.source_id}-{doc.content_hash}-chunk-{i}"
+                chunk.id = f"{doc.source_id}-{run_id}-chunk-{i}"
             try:
                 chunk_count = await self._embed_and_index(
                     chunks, batch_size=settings.EMBEDDING_BATCH_SIZE

@@ -316,6 +316,47 @@ async def test_failure_in_later_batch_rolls_back_partial_replacement(
 
 
 @pytest.mark.asyncio
+async def test_failed_run_does_not_delete_another_runs_chunks(
+    test_db: AsyncSession,
+    test_knowledge_service: KnowledgeService,
+    corpus: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await test_knowledge_service.ingest_corpus(test_db, corpus)
+    (corpus / "01_fundamentals" / "cap.md").write_text(
+        "# CAP Theorem\n## Part one\nFirst replacement.\n"
+        "## Part two\nSecond replacement.\n"
+    )
+    await test_knowledge_service.ingest_corpus(test_db, corpus)
+    after_success = await test_knowledge_service.vector_store.count()
+
+    # A concurrent run that started before the commit re-processes the same file.
+    cap = next(
+        s
+        for s in (await test_db.execute(select(Source))).scalars()
+        if s.title == "CAP Theorem"
+    )
+    cap.version = "stale"
+    await test_db.commit()
+    monkeypatch.setattr(settings, "EMBEDDING_BATCH_SIZE", 1)
+    real_embed = test_knowledge_service.embedder.embed_documents
+    calls = 0
+
+    async def fail_second(texts: list[str]):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("embedding model unavailable")
+        return await real_embed(texts)
+
+    test_knowledge_service.embedder.embed_documents = fail_second  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await test_knowledge_service.ingest_corpus(test_db, corpus)
+
+    assert await test_knowledge_service.vector_store.count() == after_success
+
+
+@pytest.mark.asyncio
 async def test_pruning_skips_alternate_roots_and_uploaded_documents(
     test_db: AsyncSession,
     test_knowledge_service: KnowledgeService,
