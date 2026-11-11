@@ -1,12 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Zap,
   Server,
   ShieldCheck,
   LayoutDashboard,
   FolderKanban,
+  PenTool,
+  Key,
 } from 'lucide-react'
-import { useStudioStore } from './store/studioStore'
+import { useStudioStore, type AppView } from './store/studioStore'
 import { api } from './api/client'
 import ProjectsPanel from './components/studio/ProjectsPanel'
 import InterviewPanel from './components/studio/InterviewPanel'
@@ -16,6 +18,8 @@ import StudioLayout from './components/studio/StudioLayout'
 import OverviewPanel from './components/studio/OverviewPanel'
 import ComponentCatalog from './components/catalog/ComponentCatalog'
 import CompatibilityChecker from './components/catalog/CompatibilityChecker'
+import WhiteboardCanvas from './components/whiteboard/WhiteboardCanvas'
+import ApiKeysModal from './components/studio/ApiKeysModal'
 
 // ── Health indicator (small) ─────────────────────────────────────────────────
 function HealthDot() {
@@ -60,6 +64,52 @@ export default function App() {
     loadTemplate,
   } = useStudioStore()
 
+  const [showApiKeys, setShowApiKeys] = useState(false)
+
+  // ── URL Synchronization (SPA Client-side routing) ───────────────────────────
+  useEffect(() => {
+    // Read initial route from URL
+    const rawPath = window.location.pathname.replace(/^\/+/, '').split('/')[0]
+    const validViews: AppView[] = [
+      'overview',
+      'canvas',
+      'whiteboard',
+      'compatibility',
+      'catalog',
+      'projects',
+      'interview',
+      'requirements',
+      'generating',
+    ]
+    if (rawPath && validViews.includes(rawPath as AppView)) {
+      setView(rawPath as AppView)
+    } else if (!rawPath || rawPath === '') {
+      window.history.replaceState(null, '', '/overview')
+      setView('overview')
+    }
+
+    // Handle browser Back / Forward buttons
+    const handlePopState = () => {
+      const p = window.location.pathname.replace(/^\/+/, '').split('/')[0]
+      if (p && validViews.includes(p as AppView)) {
+        setView(p as AppView)
+      } else {
+        setView('overview')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Sync view changes to browser URL bar
+  useEffect(() => {
+    const currentPath = window.location.pathname.replace(/^\/+/, '').split('/')[0]
+    if (currentPath !== view) {
+      window.history.pushState(null, '', `/${view}`)
+    }
+  }, [view])
+
   // Bootstrap: load catalog once on mount
   const fetchCatalog = () => {
     api.getComponents(150)
@@ -74,9 +124,10 @@ export default function App() {
   }, [])
 
   const isCanvas = view === 'canvas'
+  const isWhiteboard = view === 'whiteboard'
 
   return (
-    <div className={`w-full ${isCanvas ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-[#0B0F17] text-slate-100 flex flex-col font-sans`}>
+    <div className={`w-full ${isCanvas || isWhiteboard ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-[#0B0F17] text-slate-100 flex flex-col font-sans`}>
       {/* ── Top Header Bar ─────────────────────────────────────────────────── */}
       <header className="h-16 border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between bg-[#111726]/80 backdrop-blur-md sticky top-0 z-30 flex-shrink-0">
         <div className="flex items-center gap-4 lg:gap-6">
@@ -177,10 +228,39 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Right Info Controls */}
-        <div className="flex items-center gap-3">
+        {/* Right Info Controls & Canvas (Whiteboard) Navigation */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* API Keys & Routes Button */}
+          <button
+            onClick={() => setShowApiKeys(true)}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 bg-[#0E1526]/90 hover:bg-[#162038] text-slate-300 hover:text-white border border-slate-700/80 hover:border-indigo-500/60 shadow-sm"
+            title="Configure API Keys & View Page URLs (/overview, /canvas, ...)"
+          >
+            <Key className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden md:inline">API Keys &amp; Routes</span>
+          </button>
+
+          {/* Top Right Bar: Canvas (Whiteboard) Feature Button */}
+          <button
+            onClick={() => setView('whiteboard')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border shadow-sm ${
+              view === 'whiteboard'
+                ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white border-indigo-400/60 shadow-indigo-600/40 ring-2 ring-indigo-500/30'
+                : 'bg-[#0E1526]/90 hover:bg-[#162038] text-slate-200 hover:text-white border-slate-700/80 hover:border-indigo-500/60'
+            }`}
+            title="Open Canvas (Whiteboard) - SystemSketcher Technical Analysis"
+          >
+            <PenTool className={`w-3.5 h-3.5 ${view === 'whiteboard' ? 'text-white' : 'text-indigo-400'}`} />
+            <span>Canvas (Whiteboard)</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded hidden sm:inline ${
+              view === 'whiteboard' ? 'bg-black/30 text-indigo-100' : 'bg-indigo-950 text-indigo-300 border border-indigo-800/40'
+            }`}>
+              SystemSketcher
+            </span>
+          </button>
+
           {activeProject && view !== 'projects' && (
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
               <Zap className="w-3 h-3 text-indigo-400" />
               <span className="text-slate-300 truncate max-w-[140px] font-medium">{activeProject.name}</span>
             </div>
@@ -194,6 +274,11 @@ export default function App() {
         // Canvas gets full remaining height with no padding
         <div className="flex-1 w-full min-h-0 h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
           <StudioLayout />
+        </div>
+      ) : isWhiteboard ? (
+        // Whiteboard Canvas gets full remaining height with its own zoom/pan whiteboard surface
+        <div className="flex-1 w-full min-h-0 h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+          <WhiteboardCanvas />
         </div>
       ) : (
         <main className="flex-1 flex flex-col overflow-y-auto">
@@ -220,6 +305,11 @@ export default function App() {
           {view === 'requirements' && <RequirementsReview />}
           {view === 'generating'   && <GeneratingScreen />}
         </main>
+      )}
+
+      {/* API Keys & Routes Modal */}
+      {showApiKeys && (
+        <ApiKeysModal isOpen={showApiKeys} onClose={() => setShowApiKeys(false)} />
       )}
     </div>
   )

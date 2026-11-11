@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   FolderKanban,
   ArrowRight,
+  PenTool,
 } from 'lucide-react'
 import { useStudioStore } from '../../store/studioStore'
 import { ARCH_TEMPLATES } from '../../data/archTemplates'
@@ -62,6 +63,14 @@ export default function OverviewPanel() {
           >
             <Server className="w-4 h-4 text-blue-400" />
             Component Catalog ({catalog.length || 38})
+          </button>
+
+          <button
+            onClick={() => setView('whiteboard')}
+            className="px-5 py-3 bg-gradient-to-r from-indigo-950/70 to-purple-950/70 hover:from-indigo-900/80 hover:to-purple-900/80 border border-indigo-600/50 text-indigo-200 font-medium text-sm rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-indigo-950/50"
+          >
+            <PenTool className="w-4 h-4 text-indigo-400" />
+            Canvas (Whiteboard)
           </button>
         </div>
       </div>

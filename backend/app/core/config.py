@@ -1,10 +1,19 @@
+from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_CONFIG_PATH = Path(__file__).resolve()
+_ROOT_DIR = _CONFIG_PATH.parents[3]
+_BACKEND_DIR = _CONFIG_PATH.parents[2]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            str(_ROOT_DIR / ".env"),
+            str(_BACKEND_DIR / ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -16,6 +25,13 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     PORT: int = 8000
     HOST: str = "0.0.0.0"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def assemble_debug(cls, v: object) -> bool:
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on", "debug")
+        return bool(v)
 
     # CORS
     ALLOWED_ORIGINS: list[str] | str = [
@@ -44,6 +60,23 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@localhost:5432/system_design_studio"
     )
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_database_url(cls, v: str | None) -> str:
+        if not v or "://" not in v:
+            return v or ""
+        prefix, rest = v.split("://", 1)
+        if "@" not in rest:
+            return v
+        user_pass, host_db = rest.rsplit("@", 1)
+        if ":" in user_pass:
+            user, password = user_pass.split(":", 1)
+            from urllib.parse import quote_plus, unquote_plus
+            unquoted = unquote_plus(password)
+            encoded_password = quote_plus(unquoted)
+            return f"{prefix}://{user}:{encoded_password}@{host_db}"
+        return v
+
     # Qdrant Vector DB
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_GRPC_PORT: int = 6334
@@ -52,13 +85,13 @@ class Settings(BaseSettings):
 
     # Embedding & Reranker
     # "bge-m3" (dense + sparse from one model), "fastembed", or "hash" (offline/tests)
-    EMBEDDING_PROVIDER: str = "bge-m3"
+    EMBEDDING_PROVIDER: str = "hash"
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     SPARSE_EMBEDDING_MODEL: str = "Qdrant/bm25"
     EMBEDDING_DEVICE: str | None = None  # None = cuda if available, else cpu
     EMBEDDING_BATCH_SIZE: int = 16
     EMBEDDING_MAX_LENGTH: int = 1024
-    RERANKER_ENABLED: bool = True
+    RERANKER_ENABLED: bool = False
     # "cross-encoder" (LlamaIndex SentenceTransformerRerank) or "lexical"
     RERANKER_PROVIDER: str = "cross-encoder"
     RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"

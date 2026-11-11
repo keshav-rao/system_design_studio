@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -16,23 +16,21 @@ import {
   BackgroundVariant,
   Panel,
   MarkerType,
+  ReactFlowProvider,
+  useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useStudioStore } from '../../store/studioStore'
-import { api } from '../../api/client'
 import type { DesignNode, DesignEdge } from '../../types/api'
 import type { ComponentItem } from '../../types/catalog'
 import {
-  Plus,
-  Search,
-  X,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
   LayoutDashboard,
   ChevronDown,
+  Layers,
+  X,
 } from 'lucide-react'
 import { ARCH_TEMPLATES } from '../../data/archTemplates'
+import LeftComponentPalette from './LeftComponentPalette'
 
 // ── Category colors ──────────────────────────────────────────────────────────
 
@@ -114,130 +112,6 @@ function ArchNode({ data }: { data: any }) {
 
 const nodeTypes: NodeTypes = { arch: ArchNode }
 
-// ── Add Component Drawer ─────────────────────────────────────────────────────
-
-function AddComponentDrawer({ onClose }: { onClose: () => void }) {
-  const { catalog, addNode, canvasNodes } = useStudioStore()
-  const [search, setSearch] = useState('')
-  const [checking, setChecking] = useState<string | null>(null)
-  const [checkResult, setCheckResult] = useState<{ slug: string; ok: boolean; reason: string } | null>(null)
-
-  const filtered = catalog.filter(
-    (c) =>
-      c.is_active &&
-      (c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.slug.toLowerCase().includes(search.toLowerCase()) ||
-        c.category.toLowerCase().includes(search.toLowerCase()))
-  )
-
-  const handleAdd = async (item: ComponentItem) => {
-    // If there are existing nodes, check compatibility with first node as quick heuristic
-    if (canvasNodes.length > 0) {
-      setChecking(item.slug)
-      const firstNode = canvasNodes[0]
-      try {
-        const res = await api.checkCompatibility(firstNode.slug, item.slug)
-        setCheckResult({ slug: item.slug, ok: res.compatible, reason: res.reason })
-        if (!res.compatible) {
-          setTimeout(() => setCheckResult(null), 2500)
-          setChecking(null)
-          // Still allow adding — it's a warning, not a blocker
-        }
-      } catch {
-        // Silently ignore compatibility check failure
-      } finally {
-        setChecking(null)
-      }
-    }
-
-    const newNode: DesignNode = {
-      id: `${item.slug}-${Date.now()}`,
-      slug: item.slug,
-      category: item.category,
-      layer: item.layer,
-      replicas: 1,
-      protocols: item.protocols,
-      limits: item.limits,
-      config: {},
-    }
-    addNode(newNode)
-    onClose()
-  }
-
-  return (
-    <div className="absolute inset-y-0 right-0 w-72 bg-[#111726] border-l border-slate-800 flex flex-col z-20 shadow-2xl">
-      <div className="flex items-center justify-between p-4 border-b border-slate-800">
-        <h3 className="text-sm font-semibold text-white">Add Component</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <div className="p-3 border-b border-slate-800/60">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search catalog…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#0B0F17] border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-            autoFocus
-          />
-        </div>
-      </div>
-      {checkResult && (
-        <div
-          className={`mx-3 mt-2 p-2.5 rounded-xl text-[11px] border flex items-start gap-2 ${
-            checkResult.ok
-              ? 'bg-emerald-950/50 border-emerald-700/40 text-emerald-300'
-              : 'bg-amber-950/50 border-amber-700/40 text-amber-300'
-          }`}
-        >
-          {checkResult.ok ? (
-            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          )}
-          <span>{checkResult.reason}</span>
-        </div>
-      )}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-800/40">
-        {filtered.length === 0 ? (
-          <p className="p-6 text-center text-xs text-slate-500">No components found.</p>
-        ) : (
-          filtered.slice(0, 50).map((item) => {
-            const colors = CAT_GRADIENT[item.category] ?? { border: '#4b5563', text: '#d1d5db' }
-            return (
-              <button
-                key={item.slug}
-                onClick={() => handleAdd(item)}
-                disabled={checking === item.slug}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800/60 transition-colors text-left group"
-              >
-                <div
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: colors.border }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white group-hover:text-white">{item.name}</p>
-                  <p className="text-[10px] font-mono" style={{ color: colors.text + 'bb' }}>
-                    {item.slug} · {item.category}
-                  </p>
-                </div>
-                {checking === item.slug ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                ) : (
-                  <Plus className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-colors" />
-                )}
-              </button>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Helpers: convert DesignNode/Edge → ReactFlow nodes/edges ────────────────
 
 const LAYER_Y: Record<string, number> = {
@@ -251,20 +125,19 @@ const LAYER_Y: Record<string, number> = {
 }
 
 function designNodesToFlow(nodes: DesignNode[], catalogItems?: ComponentItem[]): Node[] {
-  // Group by layer for X positioning
   const layerCount: Record<string, number> = {}
   return nodes.map((n) => {
-    const y = LAYER_Y[n.layer] ?? 300
+    const y = n.position?.y ?? (LAYER_Y[n.layer] ?? 300)
     const idx = layerCount[n.layer] ?? 0
     layerCount[n.layer] = idx + 1
-    const x = 100 + idx * 260
+    const x = n.position?.x ?? (100 + idx * 260)
     const item = catalogItems?.find((c) => c.slug === n.slug) ?? (window as any).__catalog?.find((c: any) => c.slug === n.slug)
     return {
       id: n.id,
       type: 'arch',
       position: { x, y },
       data: {
-        label: item?.name ?? n.slug,
+        label: n.label ?? item?.name ?? n.slug,
         slug: n.slug,
         category: n.category,
         layer: n.layer,
@@ -289,9 +162,9 @@ function designEdgesToFlow(edges: DesignEdge[]): Edge[] {
   }))
 }
 
-// ── Main Canvas ─────────────────────────────────────────────────────────────
+// ── Canvas Inner Component (with useReactFlow hook) ─────────────────────────
 
-export default function ArchCanvas() {
+function ArchCanvasInner() {
   const {
     canvasNodes,
     canvasEdges,
@@ -302,7 +175,16 @@ export default function ArchCanvas() {
     catalog,
     loadTemplate,
     activeTemplateId,
+    addNode,
   } = useStudioStore()
+
+  const { screenToFlowPosition } = useReactFlow()
+  const reactFlowWrapper = useRef<HTMLDivElement>(null)
+
+  // Canvas layout states
+  const [showLeftPalette, setShowLeftPalette] = useState(true)
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false)
+  const [showLayerGuide, setShowLayerGuide] = useState(true)
 
   // Expose catalog on window for designNodesToFlow helper
   useEffect(() => {
@@ -314,8 +196,6 @@ export default function ArchCanvas() {
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(initNodes)
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(initEdges)
-  const [showAddDrawer, setShowAddDrawer] = useState(false)
-  const [showTemplateMenu, setShowTemplateMenu] = useState(false)
 
   // Sync store → ReactFlow when canvasNodes/edges change
   useEffect(() => {
@@ -350,7 +230,7 @@ export default function ArchCanvas() {
       )
       storeAddEdge({ source_id: params.source, target_id: params.target })
     },
-    [storeAddEdge]
+    [storeAddEdge, setRfEdges]
   )
 
   const onNodeClick = useCallback(
@@ -371,122 +251,207 @@ export default function ArchCanvas() {
     [storeRemoveEdge]
   )
 
+  // ── Drag and Drop from Left Palette onto Open Canvas ─────────────────────
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault()
+      const raw = event.dataTransfer.getData('application/reactflow-component')
+      if (!raw) return
+      try {
+        const item = JSON.parse(raw) as ComponentItem
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        })
+        const newNode: DesignNode = {
+          id: `${item.slug}-${Date.now()}`,
+          slug: item.slug,
+          category: item.category,
+          layer: item.layer,
+          replicas: 1,
+          protocols: item.protocols,
+          limits: item.limits,
+          config: {},
+          label: item.name,
+          position,
+        }
+        addNode(newNode)
+      } catch {}
+    },
+    [screenToFlowPosition, addNode]
+  )
+
   return (
-    <div className="w-full h-full min-h-full relative overflow-hidden" style={{ minHeight: '100%', height: '100%', width: '100%' }}>
-      <ReactFlow
-        nodes={rfNodes}
-        edges={rfEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
-        onEdgesDelete={onEdgesDelete}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        proOptions={{ hideAttribution: true }}
-        className="bg-[#0B0F17] w-full h-full"
-        style={{ width: '100%', height: '100%' }}
-        defaultEdgeOptions={{
-          animated: true,
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
-          style: { stroke: '#6366f1', strokeWidth: 1.5 },
-        }}
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={28}
-          size={1}
-          color="#1e293b"
-        />
-        <Controls
-          className="bg-[#111726] border border-slate-700 rounded-xl overflow-hidden shadow-xl"
-          showInteractive={false}
-          position="bottom-right"
-        />
-        <MiniMap
-          className="border border-slate-700 rounded-xl overflow-hidden shadow-xl"
-          nodeColor={(n) => {
-            const cat = (n.data as any)?.category ?? ''
-            return CAT_GRADIENT[cat]?.border ?? '#4b5563'
+    <div
+      ref={reactFlowWrapper}
+      className="w-full h-full min-h-full relative overflow-hidden flex"
+      style={{ minHeight: '100%', height: '100%', width: '100%' }}
+    >
+      {/* ── Requirement 2: Left Component Palette (Canva / Miro layout) ───── */}
+      <LeftComponentPalette
+        isOpen={showLeftPalette}
+        onToggle={() => setShowLeftPalette((v) => !v)}
+      />
+
+      {/* ── Main Canvas Workspace ────────────────────────────────────────── */}
+      <div className="flex-1 w-full h-full relative overflow-hidden">
+        <ReactFlow
+          nodes={rfNodes}
+          edges={rfEdges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          onEdgesDelete={onEdgesDelete}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          proOptions={{ hideAttribution: true }}
+          className="bg-[#0B0F17] w-full h-full"
+          style={{ width: '100%', height: '100%' }}
+          defaultEdgeOptions={{
+            animated: true,
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+            style: { stroke: '#6366f1', strokeWidth: 1.5 },
           }}
-          style={{ background: '#0B0F17', width: 140, height: 90 }}
-          position="bottom-right"
-        />
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={28}
+            size={1}
+            color="#1e293b"
+          />
 
-        <Panel position="top-right" className="flex items-center gap-2">
-          <div className="relative">
+          {/* Controls & MiniMap in Bottom Right */}
+          <Controls
+            className="bg-[#111726] border border-slate-700 rounded-xl overflow-hidden shadow-xl"
+            showInteractive={false}
+            position="bottom-right"
+          />
+          <MiniMap
+            className="border border-slate-700 rounded-xl overflow-hidden shadow-xl"
+            nodeColor={(n) => {
+              const cat = (n.data as any)?.category ?? ''
+              return CAT_GRADIENT[cat]?.border ?? '#4b5563'
+            }}
+            style={{ background: '#0B0F17', width: 140, height: 90 }}
+            position="bottom-right"
+          />
+
+          {/* Top Right Panel: Palette Toggle & Template Switcher */}
+          <Panel position="top-right" className="flex items-center gap-2">
             <button
-              onClick={() => setShowTemplateMenu((v) => !v)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#111726]/90 hover:bg-[#1a233b] text-slate-200 text-xs font-medium rounded-xl transition-all border border-slate-700/80 shadow-lg backdrop-blur-md"
+              onClick={() => setShowLeftPalette((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl transition-all border shadow-lg backdrop-blur-md ${
+                showLeftPalette
+                  ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-600/30'
+                  : 'bg-[#111726]/90 hover:bg-[#1a233b] text-slate-200 border-slate-700/80'
+              }`}
+              title="Toggle Left Component Palette"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
-              Templates
-              <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+              <Layers className="w-3.5 h-3.5" />
+              <span>Components</span>
             </button>
-            {showTemplateMenu && (
-              <div className="absolute right-0 mt-2 w-72 bg-[#111726] border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-30 divide-y divide-slate-800/60">
-                <div className="px-3 py-1.5">
-                  <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Canva Templates</p>
-                </div>
-                <div className="py-1 space-y-1">
-                  {Object.values(ARCH_TEMPLATES).map((tmpl) => (
-                    <button
-                      key={tmpl.id}
-                      onClick={() => {
-                        loadTemplate(tmpl.id)
-                        setShowTemplateMenu(false)
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex flex-col gap-1 ${
-                        activeTemplateId === tmpl.id
-                          ? 'bg-indigo-600/20 text-white border border-indigo-500/40'
-                          : 'text-slate-300 hover:bg-slate-800/80 border border-transparent'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white">{tmpl.name}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono font-medium">
-                          {tmpl.badge}
+
+            <div className="relative">
+              <button
+                onClick={() => setShowTemplateMenu((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#111726]/90 hover:bg-[#1a233b] text-slate-200 text-xs font-medium rounded-xl transition-all border border-slate-700/80 shadow-lg backdrop-blur-md"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
+                Templates
+                <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+              </button>
+              {showTemplateMenu && (
+                <div className="absolute right-0 mt-2 w-72 bg-[#111726] border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-30 divide-y divide-slate-800/60">
+                  <div className="px-3 py-1.5">
+                    <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Canva Templates</p>
+                  </div>
+                  <div className="py-1 space-y-1">
+                    {Object.values(ARCH_TEMPLATES).map((tmpl) => (
+                      <button
+                        key={tmpl.id}
+                        onClick={() => {
+                          loadTemplate(tmpl.id)
+                          setShowTemplateMenu(false)
+                        }}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex flex-col gap-1 ${
+                          activeTemplateId === tmpl.id
+                            ? 'bg-indigo-600/20 text-white border border-indigo-500/40'
+                            : 'text-slate-300 hover:bg-slate-800/80 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-white">{tmpl.name}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono font-medium">
+                            {tmpl.badge}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 leading-relaxed line-clamp-2">
+                          {tmpl.description}
                         </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 leading-relaxed line-clamp-2">
-                        {tmpl.description}
-                      </span>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* ── Requirement 3: Layer Guide Moved to Bottom Right ────────────── */}
+          <Panel position="bottom-right" className="mb-28 mr-0 flex flex-col items-end">
+            {showLayerGuide ? (
+              <div className="bg-[#111726]/95 border border-slate-700/80 rounded-xl p-3 text-[10px] font-mono space-y-1 backdrop-blur-md shadow-2xl w-44">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
+                  <span className="text-slate-300 font-bold text-[9px] uppercase tracking-wider">
+                    Layer Guide
+                  </span>
+                  <button
+                    onClick={() => setShowLayerGuide(false)}
+                    className="p-0.5 text-slate-400 hover:text-white rounded"
+                    title="Collapse layer guide"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                {Object.entries(LAYER_Y).map(([layer, y]) => (
+                  <div key={layer} className="flex items-center justify-between text-slate-400">
+                    <span className="capitalize text-slate-300">{layer}</span>
+                    <span className="text-[9px] text-indigo-400 font-mono">y≈{y}</span>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <button
+                onClick={() => setShowLayerGuide(true)}
+                className="px-2.5 py-1.5 rounded-lg bg-[#111726]/90 hover:bg-[#1a233b] border border-slate-700/80 text-slate-300 hover:text-white text-[10px] font-mono font-medium shadow-lg backdrop-blur-md flex items-center gap-1.5 transition-all"
+                title="Expand Layer Guide"
+              >
+                <Layers className="w-3 h-3 text-indigo-400" />
+                <span>Layer Guide</span>
+              </button>
             )}
-          </div>
-
-          <button
-            onClick={() => setShowAddDrawer(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 border border-indigo-500/50"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Component
-          </button>
-        </Panel>
-
-        {/* Layer guide */}
-        <Panel position="bottom-left">
-          <div className="bg-[#111726]/90 border border-slate-800 rounded-xl p-3 text-[10px] font-mono space-y-0.5 backdrop-blur-sm">
-            <p className="text-slate-500 font-semibold mb-1.5 text-[9px] uppercase tracking-wider">Layer Guide</p>
-            {Object.entries(LAYER_Y).map(([layer, y]) => (
-              <div key={layer} className="flex items-center gap-2 text-slate-400">
-                <span className="w-12 text-[9px] font-mono text-slate-500">y≈{y}</span>
-                <span className="capitalize">{layer}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </ReactFlow>
-
-      {/* Add Component Drawer overlay */}
-      {showAddDrawer && (
-        <AddComponentDrawer onClose={() => setShowAddDrawer(false)} />
-      )}
+          </Panel>
+        </ReactFlow>
+      </div>
     </div>
+  )
+}
+
+// ── Exported ArchCanvas with Provider ────────────────────────────────────────
+
+export default function ArchCanvas() {
+  return (
+    <ReactFlowProvider>
+      <ArchCanvasInner />
+    </ReactFlowProvider>
   )
 }

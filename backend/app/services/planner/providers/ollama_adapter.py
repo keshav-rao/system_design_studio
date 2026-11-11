@@ -53,7 +53,13 @@ class OllamaAdapter(BaseLLMAdapter):
         system_prompt: str | None = None,
         temperature: float = 0.2,
     ) -> str:
-        """Query Ollama generate API."""
+        """Query Ollama generate API with fast fallback when unreachable."""
+        if not await self.is_available():
+            logger.info("Ollama is not running. Using MockLLMAdapter.")
+            from app.services.planner.providers.mock_adapter import MockLLMAdapter
+
+            return await MockLLMAdapter().generate(prompt, system_prompt, temperature)
+
         url = f"{self.base_url}/api/generate"
         payload = {
             "model": self.model_name,
@@ -66,7 +72,8 @@ class OllamaAdapter(BaseLLMAdapter):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            timeout_cfg = httpx.Timeout(self.timeout, connect=3.0)
+            async with httpx.AsyncClient(timeout=timeout_cfg) as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()

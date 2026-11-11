@@ -31,6 +31,13 @@ class MockLLMAdapter(BaseLLMAdapter):
 
         prompt_lower = prompt.lower()
         if (
+            "video" in prompt_lower
+            or "youtube" in prompt_lower
+            or "stream" in prompt_lower
+        ):
+            return json.dumps(self._build_video_streaming_proposal(), indent=2)
+
+        if (
             "tinder" in prompt_lower
             or "dating" in prompt_lower
             or "match" in prompt_lower
@@ -38,6 +45,153 @@ class MockLLMAdapter(BaseLLMAdapter):
             return json.dumps(self._build_dating_app_proposal(), indent=2)
 
         return json.dumps(self._build_generic_proposal(), indent=2)
+
+    def _build_video_streaming_proposal(self) -> dict[str, Any]:
+        """High-scale YouTube-like video streaming architecture."""
+        return {
+            "title": "YouTube-Scale Global Video Streaming & Transcoding Architecture",
+            "summary": (
+                "A globally distributed, fault-tolerant video streaming platform designed for high availability and low latency. "
+                "Global traffic enters through Cloudflare CDN for edge caching of video segments (HLS/DASH). "
+                "API requests are routed through Kong API Gateway to FastAPI backend application clusters. "
+                "Raw uploaded videos are stored in S3 Object Storage, triggering asynchronous transcoding jobs via RabbitMQ message queues. "
+                "Hot video metadata and viewing metrics are cached in high-throughput Redis clusters, "
+                "while persistent user, channel, and video catalog records are stored in multi-region PostgreSQL instances."
+            ),
+            "nodes": [
+                {
+                    "id": "edge_cdn",
+                    "slug": "cloudflare",
+                    "category": "cdn",
+                    "layer": "edge",
+                    "replicas": 3,
+                    "protocols": ["HTTPS", "HTTP"],
+                    "limits": {"max_throughput_qps": 100000},
+                },
+                {
+                    "id": "api_gw",
+                    "slug": "kong-gateway",
+                    "category": "gateway",
+                    "layer": "gateway",
+                    "replicas": 2,
+                    "protocols": ["HTTPS", "HTTP"],
+                    "limits": {"max_throughput_qps": 50000},
+                },
+                {
+                    "id": "app_backend",
+                    "slug": "fastapi",
+                    "category": "compute",
+                    "layer": "application",
+                    "replicas": 4,
+                    "protocols": ["HTTP", "TCP"],
+                    "limits": {"max_throughput_qps": 20000},
+                },
+                {
+                    "id": "metadata_cache",
+                    "slug": "redis-cache",
+                    "category": "cache",
+                    "layer": "data",
+                    "replicas": 3,
+                    "protocols": ["RESP", "TCP"],
+                    "limits": {"max_throughput_qps": 100000},
+                },
+                {
+                    "id": "primary_db",
+                    "slug": "postgresql",
+                    "category": "database",
+                    "layer": "data",
+                    "replicas": 2,
+                    "protocols": ["SQL", "TCP"],
+                    "limits": {"max_throughput_qps": 15000},
+                },
+                {
+                    "id": "transcode_queue",
+                    "slug": "rabbitmq",
+                    "category": "queue",
+                    "layer": "async",
+                    "replicas": 2,
+                    "protocols": ["AMQP", "TCP"],
+                    "limits": {"max_throughput_qps": 30000},
+                },
+                {
+                    "id": "video_storage",
+                    "slug": "s3",
+                    "category": "storage",
+                    "layer": "data",
+                    "replicas": 3,
+                    "protocols": ["HTTPS", "REST"],
+                    "limits": {"max_throughput_qps": 10000},
+                },
+            ],
+            "edges": [
+                {
+                    "source_id": "edge_cdn",
+                    "target_id": "api_gw",
+                    "protocol": "HTTPS",
+                    "label": "API Traffic",
+                },
+                {
+                    "source_id": "api_gw",
+                    "target_id": "app_backend",
+                    "protocol": "HTTP",
+                    "label": "Dynamic routing",
+                },
+                {
+                    "source_id": "app_backend",
+                    "target_id": "metadata_cache",
+                    "protocol": "RESP",
+                    "label": "Hot metadata read/write",
+                },
+                {
+                    "source_id": "app_backend",
+                    "target_id": "primary_db",
+                    "protocol": "SQL",
+                    "label": "Metadata persistence",
+                },
+                {
+                    "source_id": "app_backend",
+                    "target_id": "transcode_queue",
+                    "protocol": "AMQP",
+                    "label": "Publish transcode task",
+                },
+                {
+                    "source_id": "app_backend",
+                    "target_id": "video_storage",
+                    "protocol": "HTTPS",
+                    "label": "Video chunk upload/stream",
+                },
+            ],
+            "requirements": {
+                "expected_users": 1000000,
+                "expected_qps": 1000,
+                "availability_target": 99.99,
+                "data_durability_required": True,
+                "regions": 2,
+            },
+            "assumptions": [
+                "Video playback streaming segments (HLS/DASH chunk files) are cached globally by Cloudflare CDN at 95%+ cache hit ratio.",
+                "Video uploads are stored directly in S3 object storage with multi-region replication.",
+                "Video transcoding workers consume background tasks asynchronously from RabbitMQ queues.",
+                "PostgreSQL manages user accounts, comments, channels, and video indexing.",
+            ],
+            "evidence_links": [
+                {
+                    "source_id": None,
+                    "source_title": "Video Streaming Architecture & CDN Caching Patterns",
+                    "collection": "case_studies",
+                    "section_path": "# Video Streaming Systems > ## Chunk-Based HLS Distribution",
+                    "snippet": "Large-scale video streaming architectures decouple video ingestion and transcoding pipelines from video delivery using object storage and global edge CDN caches.",
+                    "relevance_score": 0.95,
+                },
+            ],
+            "alternatives_considered": [
+                {
+                    "component_slug": "rabbitmq",
+                    "considered_against": "kafka",
+                    "rationale": "RabbitMQ chosen for priority task queuing of video transcoding jobs and direct acknowledgment.",
+                },
+            ],
+        }
 
     def _build_dating_app_proposal(self) -> dict[str, Any]:
         """Golden proposal for the dating-app example required by Phase 4."""

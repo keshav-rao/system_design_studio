@@ -16,6 +16,7 @@ import { ARCH_TEMPLATES, DEFAULT_TEMPLATE } from '../data/archTemplates'
 export type AppView =
   | 'overview'        // Overview / landing dashboard
   | 'canvas'          // Canva template / Architecture canvas
+  | 'whiteboard'      // Canvas (whiteboard) - SystemSketcher Reverse Engineering & Technical Analysis
   | 'compatibility'   // Connection compatibility engine
   | 'catalog'         // Component catalog explorer
   | 'projects'        // Projects list / manager
